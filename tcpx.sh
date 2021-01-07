@@ -5,12 +5,12 @@ export PATH
 #=================================================
 #	System Required: CentOS 6/7/8,Debian 8/9/10,ubuntu 16/18/19
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 1.3.2.65
+#	Version: 1.3.2.66
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
 
-sh_ver="1.3.2.65"
+sh_ver="1.3.2.66"
 github="github.000060000.xyz"
 
 Green_font_prefix="\033[32m" && Red_font_prefix="\033[31m" && Green_background_prefix="\033[42;37m" && Red_background_prefix="\033[41;37m" && Font_color_suffix="\033[0m"
@@ -525,6 +525,17 @@ startbbr2cakeecn(){
 	sysctl --system
 	echo -e "${Info}BBR2修改成功，重启生效！"
 }
+
+#启用BBR2+fq_pie+ecn
+startbbr2fqpieecn(){
+	remove_bbr_lotserver
+	echo "net.ipv4.tcp_ecn=1" >> /etc/sysctl.d/99-sysctl.conf
+	echo "net.core.default_qdisc=fq_pie" >> /etc/sysctl.d/99-sysctl.conf
+	echo "net.ipv4.tcp_congestion_control=bbr2" >> /etc/sysctl.d/99-sysctl.conf
+	sysctl --system
+	echo -e "${Info}BBR2修改成功，重启生效！"
+}
+
 
 #卸载bbr+锐速
 remove_bbr_lotserver(){
@@ -1103,7 +1114,12 @@ echo && echo -e " TCP加速 一键安装管理脚本 ${Red_font_prefix}[v${sh_ve
  ${Green_font_prefix}12.${Font_color_suffix} 使用BBR+CAKE加速 
  ${Green_font_prefix}13.${Font_color_suffix} 使用BBRplus+FQ版加速
  ${Green_font_prefix}14.${Font_color_suffix} 使用Lotserver(锐速)加速
- ${Green_font_prefix}19.${Font_color_suffix} 使用BBR+FQ_PIE加速 
+ ${Green_font_prefix}15.${Font_color_suffix} 使用BBR2 + FQ加速
+ ${Green_font_prefix}16.${Font_color_suffix} 使用BBR2 + CAKE加速
+ ${Green_font_prefix}17.${Font_color_suffix} 使用BBR2 + FQ + ECN加速
+ ${Green_font_prefix}18.${Font_color_suffix} 使用BBR2 + CAKE + ECN加速
+ ${Green_font_prefix}19.${Font_color_suffix} 使用BBR2 + FQ_PIE + ECN加速
+ ${Green_font_prefix}20.${Font_color_suffix} 使用BBR+FQ_PIE加速 
 ————————————杂项管理————————————
  ${Green_font_prefix}21.${Font_color_suffix} 卸载全部加速
  ${Green_font_prefix}22.${Font_color_suffix} 系统配置优化
@@ -1175,7 +1191,7 @@ case "$num" in
 	11)
 	startbbrfq
 	;;
-	19)
+	20)
 	startbbrfqpie	
 	;;
 	12)
@@ -1199,6 +1215,8 @@ case "$num" in
 	18)
 	startbbr2cakeecn
 	;;
+	19)
+	startbbr2fqpieecn
 	21)
 	remove_all
 	;;
