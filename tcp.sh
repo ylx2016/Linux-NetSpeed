@@ -20,6 +20,7 @@ github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
 headurl=""
+github_network=1
 
 Green_font_prefix="\033[32m"
 Red_font_prefix="\033[31m"
@@ -33,33 +34,34 @@ if [ -f "/etc/sysctl.d/bbr.conf" ]; then
 fi
 
 # 检查当前用户是否为 root 用户
-if [ "$EUID" -ne 0 ]
-  then echo "请使用 root 用户身份运行此脚本"
+if [ "$EUID" -ne 0 ]; then
+  echo "请使用 root 用户身份运行此脚本"
   exit
 fi
 
-#检查github网络
+# 检查github网络
 check_github() {
-  # 检测 raw.githubusercontent.com 的可访问性
-  if ! curl --head --silent --fail "https://raw.githubusercontent.com" >/dev/null; then
-    echo "无法访问 https://raw.githubusercontent.com 请检查网络或者本地DNS"
-    exit 1
-  fi
+  # 检测域名的可访问性函数
+  check_domain() {
+    local domain="$1"
+    if ! curl --head --silent --fail "$domain" >/dev/null; then
+      echo -e "${Error}无法访问 $domain，请检查网络或者本地DNS"
+      github_network=0
+    fi
+  }
 
-  # 检测 api.github.com 的可访问性
-  if ! curl --head --silent --fail "https://api.github.com" >/dev/null; then
-    echo "无法访问 https://api.github.com 请检查网络或者本地DNS"
-    exit 1
-  fi
+  # 检测所有域名的可访问性
+  check_domain "https://raw.githubusercontent.com"
+  check_domain "https://api.github.com"
+  check_domain "https://github.com"
 
-  # 检测 github.com 的可访问性
-  if ! curl --head --silent --fail "https://github.com" >/dev/null; then
-    echo "无法访问 https://github.com 请检查网络或者本地DNS"
-    exit 1
+  if [ "$github_network" -eq 0 ]; then
+    echo -e "${Error}github网络访问受限，将影响内核的安装以及脚本的检查更新，5秒后继续运行脚本"
+    sleep 5
+  else
+    # 所有域名均可访问，打印成功提示
+    echo "${Green_font_prefix}github可访问${Font_color_suffix}，继续执行脚本..."
   fi
-
-  # 所有域名均可访问，打印成功提示
-  echo "${Green_font_prefix}github可访问{Font_color_suffix}，继续执行脚本..."
 }
 
 #检查连接
@@ -1128,19 +1130,22 @@ optimizing_ddcc() {
 
 #更新脚本
 Update_Shell() {
-  local shell_file="$(readlink -f "$0")"
-    local shell_url="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"
+  local shell_file
+  shell_file="$(readlink -f "$0")"
+  local shell_url="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"
 
   # 下载最新版本的脚本
-    wget -O "/tmp/tcp.sh" "$shell_url" &>/dev/null
+  wget -O "/tmp/tcp.sh" "$shell_url" &>/dev/null
 
   # 比较本地和远程脚本的 md5 值
-  local md5_local="$(md5sum "$shell_file" | awk '{print $1}')"
-    local md5_remote="$(md5sum /tmp/tcp.sh | awk '{print $1}')"
+  local md5_local
+  local md5_remote
+  md5_local="$(md5sum "$shell_file" | awk '{print $1}')"
+  md5_remote="$(md5sum /tmp/tcp.sh | awk '{print $1}')"
 
   if [ "$md5_local" != "$md5_remote" ]; then
     # 替换本地脚本文件
-        cp "/tmp/tcp.sh" "$shell_file"
+    cp "/tmp/tcp.sh" "$shell_file"
     chmod +x "$shell_file"
 
     echo "脚本已更新，请重新运行。"
@@ -1393,7 +1398,6 @@ detele_kernel_head() {
     fi
   fi
 }
-
 
 #更新引导
 BBR_grub() {
@@ -1789,7 +1793,6 @@ check_sys_Lotsever() {
   fi
 }
 
-
 #检查系统当前状态
 check_status() {
   kernel_version=$(uname -r | awk -F "-" '{print $1}')
@@ -1876,4 +1879,5 @@ check_status() {
 check_sys
 check_version
 [[ ${release} != "debian" ]] && [[ ${release} != "ubuntu" ]] && [[ ${release} != "centos" ]] && echo -e "${Error} 本脚本不支持当前系统 ${release} !" && exit 1
+check_github
 start_menu
