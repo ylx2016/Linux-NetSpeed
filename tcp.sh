@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.1.20
+#	Version: 100.0.1.21
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.1.20"
+sh_ver="100.0.1.21"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -32,28 +32,34 @@ if [ -f "/etc/sysctl.d/bbr.conf" ]; then
   rm -rf /etc/sysctl.d/bbr.conf
 fi
 
+# 检查当前用户是否为 root 用户
+if [ "$EUID" -ne 0 ]
+  then echo "请使用 root 用户身份运行此脚本"
+  exit
+fi
+
 #检查github网络
 check_github() {
   # 检测 raw.githubusercontent.com 的可访问性
-  if ! curl --head --silent --fail "https://raw.githubusercontent.com" > /dev/null; then
+  if ! curl --head --silent --fail "https://raw.githubusercontent.com" >/dev/null; then
     echo "无法访问 https://raw.githubusercontent.com 请检查网络或者本地DNS"
     exit 1
   fi
 
   # 检测 api.github.com 的可访问性
-  if ! curl --head --silent --fail "https://api.github.com" > /dev/null; then
+  if ! curl --head --silent --fail "https://api.github.com" >/dev/null; then
     echo "无法访问 https://api.github.com 请检查网络或者本地DNS"
     exit 1
   fi
 
   # 检测 github.com 的可访问性
-  if ! curl --head --silent --fail "https://github.com" > /dev/null; then
+  if ! curl --head --silent --fail "https://github.com" >/dev/null; then
     echo "无法访问 https://github.com 请检查网络或者本地DNS"
     exit 1
   fi
 
   # 所有域名均可访问，打印成功提示
-  echo "github可访问，继续执行脚本..."
+  echo "${Green_font_prefix}github可访问{Font_color_suffix}，继续执行脚本..."
 }
 
 #检查连接
@@ -94,7 +100,7 @@ installbbr() {
         #github_ver=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}' | awk -F '[_]' '{print $3}')
         github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Centos_Kernel' | grep '_latest_bbr_' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
         github_ver=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}')
-        echo -e "获取的版本号为:${github_ver}"
+        echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
         kernel_version=$github_ver
         detele_kernel_head
         headurl=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep 'headers' | awk -F '"' '{print $4}')
@@ -122,7 +128,7 @@ installbbr() {
       echo -e "如果下载地址出错，可能当前正在更新，超过半天还是出错请反馈，大陆自行解决污染问题"
       github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Debian_Kernel' | grep '_latest_bbr_' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
       github_ver=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'deb' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}' | awk -F '[_]' '{print $1}')
-      echo -e "获取的版本号为:${github_ver}"
+      echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
       kernel_version=$github_ver
       detele_kernel_head
       headurl=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'deb' | grep 'headers' | awk -F '"' '{print $4}')
@@ -144,7 +150,7 @@ installbbr() {
       echo -e "如果下载地址出错，可能当前正在更新，超过半天还是出错请反馈，大陆自行解决污染问题"
       github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Debian_Kernel' | grep '_arm64_' | grep '_bbr_' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
       github_ver=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'deb' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}' | awk -F '[_]' '{print $1}')
-      echo -e "获取的版本号为:${github_ver}"
+      echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
       kernel_version=$github_ver
       detele_kernel_head
       headurl=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'deb' | grep 'headers' | awk -F '"' '{print $4}')
@@ -387,7 +393,7 @@ installxanmod() {
         echo -e "如果下载地址出错，可能当前正在更新，超过半天还是出错请反馈，大陆自行解决污染问题"
         github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Centos_Kernel' | grep '_lts_latest_' | grep 'xanmod' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
         github_ver=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}')
-        echo -e "获取的版本号为:${github_ver}"
+        echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
         kernel_version=$github_ver
         detele_kernel_head
         headurl=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep 'headers' | awk -F '"' '{print $4}')
@@ -410,7 +416,7 @@ installxanmod() {
       echo -e "如果下载地址出错，可能当前正在更新，超过半天还是出错请反馈，大陆自行解决污染问题"
       github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Centos_Kernel' | grep '_lts_C8_latest_' | grep 'xanmod' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
       github_ver=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}')
-      echo -e "获取的版本号为:${github_ver}"
+      echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
       kernel_version=$github_ver
       detele_kernel_head
       headurl=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep 'headers' | awk -F '"' '{print $4}')
@@ -520,7 +526,7 @@ installbbrplusnew() {
       if [[ ${bit} == "x86_64" ]]; then
         #github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Centos_Kernel' | grep '_latest_bbrplus_' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
         #github_ver=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}' | awk -F '[_]' '{print $1}')
-        #echo -e "获取的版本号为:${github_ver}"
+        #echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
         kernel_version=${github_ver_plus_num}-bbrplus
         detele_kernel_head
         headurl=$(curl -s 'https://api.github.com/repos/UJX6N/bbrplus-6.x_stable/releases' | grep ${github_ver_plus} | grep 'rpm' | grep 'headers' | grep 'el7' | awk -F '"' '{print $4}' | grep 'http')
@@ -544,7 +550,7 @@ installbbrplusnew() {
       if [[ ${bit} == "x86_64" ]]; then
         #github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Centos_Kernel' | grep '_latest_bbrplus_' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
         #github_ver=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}' | awk -F '[_]' '{print $1}')
-        #echo -e "获取的版本号为:${github_ver}"
+        #echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
         kernel_version=${github_ver_plus_num}-bbrplus
         detele_kernel_head
         headurl=$(curl -s 'https://api.github.com/repos/UJX6N/bbrplus-6.x_stable/releases' | grep ${github_ver_plus} | grep 'rpm' | grep 'headers' | grep 'el8.x86_64' | grep 'https' | awk -F '"' '{print $4}' | grep 'http')
@@ -568,7 +574,7 @@ installbbrplusnew() {
     if [[ ${bit} == "x86_64" ]]; then
       #github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Ubuntu_Kernel' | grep '_latest_bbrplus_' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
       #github_ver=$(curl -s 'http s://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'deb' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}' | awk -F '[_]' '{print $1}')
-      #echo -e "获取的版本号为:${github_ver}"
+      #echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
       kernel_version=${github_ver_plus_num}-bbrplus
       detele_kernel_head
       headurl=$(curl -s 'https://api.github.com/repos/UJX6N/bbrplus-6.x_stable/releases' | grep ${github_ver_plus} | grep 'https' | grep 'amd64.deb' | grep 'headers' | awk -F '"' '{print $4}' | grep 'http')
@@ -587,7 +593,7 @@ installbbrplusnew() {
     elif [[ ${bit} == "aarch64" ]]; then
       #github_tag=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep 'Ubuntu_Kernel' | grep '_latest_bbrplus_' | head -n 1 | awk -F '"' '{print $4}' | awk -F '[/]' '{print $8}')
       #github_ver=$(curl -s 'http s://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'deb' | grep 'headers' | awk -F '"' '{print $4}' | awk -F '[/]' '{print $9}' | awk -F '[-]' '{print $3}' | awk -F '[_]' '{print $1}')
-      #echo -e "获取的版本号为:${github_ver}"
+      #echo -e "获取的版本号为:${Green_font_prefix}${github_ver}${Font_color_suffix}"
       kernel_version=${github_ver_plus_num}-bbrplus
       detele_kernel_head
       headurl=$(curl -s 'https://api.github.com/repos/UJX6N/bbrplus-6.x_stable/releases' | grep ${github_ver_plus} | grep 'https' | grep 'arm64.deb' | grep 'headers' | awk -F '"' '{print $4}')
@@ -1122,26 +1128,26 @@ optimizing_ddcc() {
 
 #更新脚本
 Update_Shell() {
-	local shell_file="$(readlink -f "$0")"
+  local shell_file="$(readlink -f "$0")"
     local shell_url="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcp.sh"
 
-    # 下载最新版本的脚本
+  # 下载最新版本的脚本
     wget -O "/tmp/tcp.sh" "$shell_url" &>/dev/null
 
-    # 比较本地和远程脚本的 md5 值
-    local md5_local="$(md5sum "$shell_file" | awk '{print $1}')"
+  # 比较本地和远程脚本的 md5 值
+  local md5_local="$(md5sum "$shell_file" | awk '{print $1}')"
     local md5_remote="$(md5sum /tmp/tcp.sh | awk '{print $1}')"
 
-    if [ "$md5_local" != "$md5_remote" ]; then
-        # 替换本地脚本文件
+  if [ "$md5_local" != "$md5_remote" ]; then
+    # 替换本地脚本文件
         cp "/tmp/tcp.sh" "$shell_file"
-        chmod +x "$shell_file"
+    chmod +x "$shell_file"
 
-        echo "脚本已更新，请重新运行。"
-        exit 0
-    else
-        echo "脚本是最新版本，无需更新。"
-    fi
+    echo "脚本已更新，请重新运行。"
+    exit 0
+  else
+    echo "脚本是最新版本，无需更新。"
+  fi
 }
 
 #切换到不卸载内核版本
@@ -1451,14 +1457,13 @@ BBR_grub() {
   fi
 }
 
-
 #简单的检查内核
 check_kernel() {
-    if [[ -z "$(find /boot -type f -name 'vmlinuz-*' ! -name 'vmlinuz-*rescue*')" ]]; then
-        echo -e "\033[0;31m警告: 未发现内核文件，请勿重启系统，不卸载内核版本选择30安装默认内核救急！\033[0m"
-    else
-        echo -e "\033[0;32m发现内核文件，看起来可以重启。\033[0m"
-    fi
+  if [[ -z "$(find /boot -type f -name 'vmlinuz-*' ! -name 'vmlinuz-*rescue*')" ]]; then
+    echo -e "\033[0;31m警告: 未发现内核文件，请勿重启系统，不卸载内核版本选择30安装默认内核救急！\033[0m"
+  else
+    echo -e "\033[0;32m发现内核文件，看起来可以重启。\033[0m"
+  fi
 }
 
 #############内核管理组件#############
@@ -1469,17 +1474,11 @@ check_kernel() {
 check_sys() {
   if [[ -f /etc/redhat-release ]]; then
     release="centos"
-  elif cat /etc/issue | grep -q -E -i "debian"; then
+  elif grep -qi "debian" /etc/issue; then
     release="debian"
-  elif cat /etc/issue | grep -q -E -i "ubuntu"; then
+  elif grep -qi "ubuntu" /etc/issue; then
     release="ubuntu"
-  elif cat /etc/issue | grep -q -E -i "centos|red hat|redhat"; then
-    release="centos"
-  elif cat /proc/version | grep -q -E -i "debian"; then
-    release="debian"
-  elif cat /proc/version | grep -q -E -i "ubuntu"; then
-    release="ubuntu"
-  elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
+  elif grep -qi -E "centos|red hat|redhat" /etc/issue || grep -qi -E "centos|red hat|redhat" /proc/version; then
     release="centos"
   fi
 
@@ -1499,85 +1498,23 @@ check_sys() {
   }
 
   get_opsy() {
-    [ -f /etc/redhat-release ] && awk '{print ($1,$3~/^[0-9]/?$3:$4)}' /etc/redhat-release && return
-    [ -f /etc/os-release ] && awk -F'[= "]' '/PRETTY_NAME/{print $3,$4,$5}' /etc/os-release && return
-    [ -f /etc/lsb-release ] && awk -F'[="]+' '/DESCRIPTION/{print $2}' /etc/lsb-release && return
+    if [ -f /etc/os-release ]; then
+      awk -F'[= "]' '/PRETTY_NAME/{print $3,$4,$5}' /etc/os-release
+    elif [ -f /etc/lsb-release ]; then
+      awk -F'[="]+' '/DESCRIPTION/{print $2}' /etc/lsb-release
+    elif [ -f /etc/system-release ]; then
+      cat /etc/system-release | awk '{print $1,$2}'
+    fi
   }
+
   get_system_info() {
-    #cname=$(awk -F: '/model name/ {name=$2} END {print name}' /proc/cpuinfo | sed 's/^[ \t]*//;s/[ \t]*$//')
-    #cores=$(awk -F: '/model name/ {core++} END {print core}' /proc/cpuinfo)
-    #freq=$(awk -F: '/cpu MHz/ {freq=$2} END {print freq}' /proc/cpuinfo | sed 's/^[ \t]*//;s/[ \t]*$//')
-    #corescache=$(awk -F: '/cache size/ {cache=$2} END {print cache}' /proc/cpuinfo | sed 's/^[ \t]*//;s/[ \t]*$//')
-    #tram=$(free -m | awk '/Mem/ {print $2}')
-    #uram=$(free -m | awk '/Mem/ {print $3}')
-    #bram=$(free -m | awk '/Mem/ {print $6}')
-    #swap=$(free -m | awk '/Swap/ {print $2}')
-    #uswap=$(free -m | awk '/Swap/ {print $3}')
-    #up=$(awk '{a=$1/86400;b=($1%86400)/3600;c=($1%3600)/60} {printf("%d days %d hour %d min\n",a,b,c)}' /proc/uptime)
-    #load=$(w | head -1 | awk -F'load average:' '{print $2}' | sed 's/^[ \t]*//;s/[ \t]*$//')
     opsy=$(get_opsy)
     arch=$(uname -m)
-    #lbit=$(getconf LONG_BIT)
     kern=$(uname -r)
-
-    # disk_size1=$( LANG=C df -hPl | grep -wvE '\-|none|tmpfs|overlay|shm|udev|devtmpfs|by-uuid|chroot|Filesystem' | awk '{print $2}' )
-    # disk_size2=$( LANG=C df -hPl | grep -wvE '\-|none|tmpfs|overlay|shm|udev|devtmpfs|by-uuid|chroot|Filesystem' | awk '{print $3}' )
-    # disk_total_size=$( calc_disk ${disk_size1[@]} )
-    # disk_used_size=$( calc_disk ${disk_size2[@]} )
-
-    #tcpctrl=$(sysctl net.ipv4.tcp_congestion_control | awk -F ' ' '{print $3}')
-
     virt_check
   }
   # from LemonBench
   virt_check() {
-    # if hash ifconfig 2>/dev/null; then
-    # eth=$(ifconfig)
-    # fi
-
-    # _exists "dmesg" && virtualx="$(dmesg 2>/dev/null)"
-
-    # if _exists "dmidecode"; then
-    # sys_manu="$(dmidecode -s system-manufacturer 2>/dev/null)"
-    # sys_product="$(dmidecode -s system-product-name 2>/dev/null)"
-    # sys_ver="$(dmidecode -s system-version 2>/dev/null)"
-    # else
-    # sys_manu=""
-    # sys_product=""
-    # sys_ver=""
-    # fi
-    # if   grep -qa docker /proc/1/cgroup; then
-    # virtual="Docker"
-    # elif grep -qa lxc /proc/1/cgroup; then
-    # virtual="LXC"
-    # elif grep -qa container=lxc /proc/1/environ; then
-    # virtual="LXC"
-    # elif [[ -f /proc/user_beancounters ]]; then
-    # virtual="OpenVZ"
-    # elif [[ "${virtualx}" == *kvm-clock* ]]; then
-    # virtual="KVM"
-    # elif [[ "${cname}" == *KVM* ]]; then
-    # virtual="KVM"
-    # elif [[ "${cname}" == *QEMU* ]]; then
-    # virtual="KVM"
-    # elif [[ "${virtualx}" == *"VMware Virtual Platform"* ]]; then
-    # virtual="VMware"
-    # elif [[ "${virtualx}" == *"Parallels Software International"* ]]; then
-    # virtual="Parallels"
-    # elif [[ "${virtualx}" == *VirtualBox* ]]; then
-    # virtual="VirtualBox"
-    # elif [[ -e /proc/xen ]]; then
-    # virtual="Xen"
-    # elif [[ "${sys_manu}" == *"Microsoft Corporation"* ]]; then
-    # if [[ "${sys_product}" == *"Virtual Machine"* ]]; then
-    # if [[ "${sys_ver}" == *"7.0"* || "${sys_ver}" == *"Hyper-V" ]]; then
-    # virtual="Hyper-V"
-    # else
-    # virtual="Microsoft Virtual Machine"
-    # fi
-    # else
-    # virtual="Dedicated母鸡"
-    # fi
     if [ -f "/usr/bin/systemd-detect-virt" ]; then
       Var_VirtType="$(/usr/bin/systemd-detect-virt)"
       # 虚拟机检测
@@ -1647,7 +1584,7 @@ check_sys() {
       Var_VirtTypeCount="$(echo $Var_VirtTypeCount | wc -l)"
       if [ "${Var_VirtTypeCount}" -gt "1" ]; then # 处理嵌套虚拟化
         virtual="echo ${Var_VirtType}"
-        Var_VirtType="$(echo ${Var_VirtType} | head -n1)" # 使用检测到的第一种虚拟化继续做判断
+        Var_VirtType="$(echo ${Var_VirtType} | head -n1)"                          # 使用检测到的第一种虚拟化继续做判断
       elif [ "${Var_VirtTypeCount}" -eq "1" ] && [ "${Var_VirtType}" != "" ]; then # 只有一种虚拟化
         virtual="${Var_VirtType}"
       else
@@ -1666,62 +1603,60 @@ check_sys() {
 
   #检查依赖
   if [[ "${release}" == "centos" ]]; then
-    if (yum list installed ca-certificates | grep '202'); then
-      echo 'CA证书检查OK'
-    else
-      echo 'CA证书检查不通过，处理中'
+    # 检查是否安装了 ca-certificates 包，如果未安装则安装
+    if ! rpm -q ca-certificates >/dev/null; then
+      echo '正在安装 ca-certificates 包...'
       yum install ca-certificates -y
       update-ca-trust force-enable
     fi
-    if ! type curl >/dev/null 2>&1; then
-      echo 'curl 未安装 安装中'
-      yum install curl -y
-    else
-      echo 'curl 已安装，继续'
-    fi
+    echo 'CA证书检查OK'
 
-    if ! type wget >/dev/null 2>&1; then
-      echo 'wget 未安装 安装中'
-      yum install curl -y
-    else
-      echo 'wget 已安装，继续'
-    fi
+    # 检查并安装 curl、wget 和 dmidecode 包
+    for pkg in curl wget dmidecode redhat-lsb-core; do
+      if ! type $pkg >/dev/null 2>&1; then
+        echo "未安装 $pkg，正在安装..."
+        yum install $pkg -y
+      else
+        echo "$pkg 已安装。"
+      fi
+    done
 
-    if ! type dmidecode >/dev/null 2>&1; then
-      echo 'dmidecode 未安装 安装中'
-      yum install dmidecode -y
+    if [ -x "$(command -v lsb_release)" ]; then
+      echo "lsb_release 已安装"
     else
-      echo 'dmidecode 已安装，继续'
+      echo "lsb_release 未安装，现在开始安装..."
+      yum install redhat-lsb-core -y
     fi
 
   elif [[ "${release}" == "debian" || "${release}" == "ubuntu" ]]; then
-    if (apt list --installed | grep 'ca-certificates' | grep '202'); then
-      echo 'CA证书检查OK'
-    else
-      echo 'CA证书检查不通过，处理中'
+    # 检查是否安装了 ca-certificates 包，如果未安装则安装
+    if ! dpkg-query -W ca-certificates >/dev/null; then
+      echo '正在安装 ca-certificates 包...'
       apt-get update || apt-get --allow-releaseinfo-change update && apt-get install ca-certificates -y
       update-ca-certificates
     fi
-    if ! type curl >/dev/null 2>&1; then
-      echo 'curl 未安装 安装中'
-      apt-get update || apt-get --allow-releaseinfo-change update && apt-get install curl -y
+    echo 'CA证书检查OK'
+
+    # 检查并安装 curl、wget 和 dmidecode 包
+    for pkg in curl wget dmidecode; do
+      if ! type $pkg >/dev/null 2>&1; then
+        echo "未安装 $pkg，正在安装..."
+        apt-get update || apt-get --allow-releaseinfo-change update && apt-get install $pkg -y
+      else
+        echo "$pkg 已安装。"
+      fi
+    done
+
+    if [ -x "$(command -v lsb_release)" ]; then
+      echo "lsb_release 已安装"
     else
-      echo 'curl 已安装，继续'
+      echo "lsb_release 未安装，现在开始安装..."
+      apt-get install lsb-release -y
     fi
 
-    if ! type wget >/dev/null 2>&1; then
-      echo 'wget 未安装 安装中'
-      apt-get update || apt-get --allow-releaseinfo-change update && apt-get install wget -y
-    else
-      echo 'wget 已安装，继续'
-    fi
-
-    if ! type dmidecode >/dev/null 2>&1; then
-      echo 'dmidecode 未安装 安装中'
-      apt-get update || apt-get --allow-releaseinfo-change update && apt-get install dmidecode -y
-    else
-      echo 'dmidecode 已安装，继续'
-    fi
+  else
+    echo "不支持的操作系统发行版：${release}"
+    exit 1
   fi
 }
 
@@ -1733,11 +1668,7 @@ check_version() {
     version=$(grep -oE "[0-9.]+" /etc/issue | cut -d . -f 1)
   fi
   bit=$(uname -m)
-  # if [[ ${bit} = "x86_64" ]]; then
-  # bit="x64"
-  # else
-  # bit="x32"
-  # fi
+  check_github
 }
 
 #检查安装bbr的系统要求
@@ -1945,5 +1876,4 @@ check_status() {
 check_sys
 check_version
 [[ ${release} != "debian" ]] && [[ ${release} != "ubuntu" ]] && [[ ${release} != "centos" ]] && echo -e "${Error} 本脚本不支持当前系统 ${release} !" && exit 1
-check_github
 start_menu
