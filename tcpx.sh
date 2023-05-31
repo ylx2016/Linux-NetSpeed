@@ -1061,7 +1061,7 @@ EOF
     echo "session required pam_limits.so" >>/etc/pam.d/common-session
   fi
   systemctl daemon-reload
-  echo -e "${Info}johnrosen1优化方案应用结束，可能需要重启！"
+  echo -e "${Info}优化方案2应用结束，可能需要重启！"
 }
 
 optimizing_ddcc() {
