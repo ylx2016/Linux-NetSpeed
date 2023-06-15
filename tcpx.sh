@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.1.21
+#	Version: 100.0.1.22
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.1.21"
+sh_ver="100.0.1.22"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -78,13 +78,31 @@ checkurl() {
 
 #cn使用fastgit.org的github加速
 check_cn() {
-  geoip=$(wget --user-agent="Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Safari/537.36" --no-check-certificate -qO- https://api.ip.sb/geoip -T 10 | grep "\"country_code\":\"CN\"")
-  if [[ "$geoip" != "" ]]; then
-    # echo "下面使用fastgit.org的加速服务"
-    # echo ${1//github.com/download.fastgit.org}
-    echo https://endpoint.fastgit.org/$1
+  # 检查是否安装了jq命令，如果没有安装则进行安装
+  if ! command -v jq >/dev/null 2>&1; then
+    if command -v yum >/dev/null 2>&1; then
+      sudo yum install -y jq
+    elif command -v apt-get >/dev/null 2>&1; then
+      sudo apt-get update
+      sudo apt-get install -y jq
+    else
+      echo "无法安装jq命令。请手动安装jq后再试。"
+      exit 1
+    fi
+  fi
+
+  # 获取当前IP地址，设置超时为3秒
+  current_ip=$(curl -s --max-time 3 https://api.ipify.org)
+
+  # 使用ip-api.com查询IP所在国家，设置超时为3秒
+  response=$(curl -s --max-time 3 "http://ip-api.com/json/$current_ip")
+
+  # 检查国家是否为中国
+  country=$(echo "$response" | jq -r '.countryCode')
+  if [[ "$country" == "CN" ]]; then
+    echo "https://endpoint.fastgit.org/$1"
   else
-    echo $1
+    echo "$1"
   fi
 }
 
@@ -472,9 +490,9 @@ installxanmod() {
 installbbrplusnew() {
   github_ver_plus=$(curl -s https://api.github.com/repos/UJX6N/bbrplus-6.x_stable/releases | grep /bbrplus-6.x_stable/releases/tag/ | head -1 | awk -F "[/]" '{print $8}' | awk -F "[\"]" '{print $1}')
   github_ver_plus_num=$(curl -s https://api.github.com/repos/UJX6N/bbrplus-6.x_stable/releases | grep /bbrplus-6.x_stable/releases/tag/ | head -1 | awk -F "[/]" '{print $8}' | awk -F "[\"]" '{print $1}' | awk -F "[-]" '{print $1}')
-  echo -e "获取的UJX6N的bbrplus-6.x_stable版本号为:${github_ver_plus}"
+  echo -e "获取的UJX6N的bbrplus-6.x_stable版本号为:${Green_font_prefix}${github_ver_plus}${Font_color_suffix}"
   echo -e "如果下载地址出错，可能当前正在更新，超过半天还是出错请反馈，大陆自行解决污染问题"
-  echo -e "安装失败这边反馈，内核问题给UJX6N反馈"
+  echo -e "${Green_font_prefix}安装失败这边反馈，内核问题给UJX6N反馈${Font_color_suffix}"
   # kernel_version=$github_ver_plus
 
   bit=$(uname -m)
