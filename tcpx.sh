@@ -1807,12 +1807,14 @@ check_sys_official() {
       echo -e "${Error} 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
     fi
   elif [[ "${release}" == "debian" ]]; then
+    apt update
     if [[ ${bit} == "x86_64" ]]; then
-      apt-get install linux-image-amd64 linux-headers-amd64 -y
+      apt-get update && apt-get install linux-image-amd64 linux-headers-amd64 -y
     elif [[ ${bit} == "aarch64" ]]; then
       apt-get install linux-image-arm64 linux-headers-arm64 -y
     fi
   elif [[ "${release}" == "ubuntu" ]]; then
+    apt update
     apt-get install linux-image-generic linux-headers-generic -y
   else
     echo -e "${Error} 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
@@ -1899,6 +1901,7 @@ check_sys_official_xanmod() {
   fi
 
   if [[ "${release}" == "debian" || "${release}" == "ubuntu" ]]; then
+    apt update
     apt-get install gnupg gnupg2 gnupg1 sudo -y
     echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
     wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
