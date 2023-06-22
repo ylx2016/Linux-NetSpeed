@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.1.22
+#	Version: 100.0.1.23
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.1.22"
+sh_ver="100.0.1.23"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -66,9 +66,16 @@ check_github() {
 
 #检查连接
 checkurl() {
-  url=$(curl --max-time 5 --retry 3 --retry-delay 2 --connect-timeout 2 -s --head $1 | head -n 1)
-  # echo ${url}
-  if [[ ${url} == *200* || ${url} == *302* || ${url} == *308* ]]; then
+  local url="$1"
+  
+  if [[ -z "$url" ]]; then
+    echo "错误：缺少URL参数！"
+    exit 1
+  fi
+
+  local responseCode=$(curl -s -L -m 10 --retry 3 --retry-delay 2 --connect-timeout 5 -o /dev/null -w "%{http_code}" "$url")
+
+  if [[ "$responseCode" =~ ^(200|3[0-9]{2})$ ]]; then
     echo "下载地址检查OK，继续！"
   else
     echo "下载地址检查出错，退出！"
