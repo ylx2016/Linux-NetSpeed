@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.1.23
+#	Version: 100.0.1.24
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.1.23"
+sh_ver="100.0.1.24"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -67,21 +67,34 @@ check_github() {
 #检查连接
 checkurl() {
   local url="$1"
+  local maxRetries=3
+  local retryDelay=2
   
   if [[ -z "$url" ]]; then
     echo "错误：缺少URL参数！"
     exit 1
   fi
 
-  local responseCode=$(curl -s -L -m 10 --retry 3 --retry-delay 2 --connect-timeout 10 -o /dev/null -w "%{http_code}" "$url")
-  echo "响应代码为"$responseCode",临时测试数据,请忽略"
-  if [[ "$responseCode" =~ ^(200|3[0-9]{2})$ ]]; then
+  local retries=0
+  local responseCode=""
+  
+  while [[ -z "$responseCode" && $retries -lt $maxRetries ]]; do
+    responseCode=$(curl -s -L -m 10 --connect-timeout 5 -o /dev/null -w "%{http_code}" "$url")
+    
+    if [[ -z "$responseCode" ]]; then
+      ((retries++))
+      sleep $retryDelay
+    fi
+  done
+
+  if [[ -n "$responseCode" && ("$responseCode" == "200" || "$responseCode" =~ ^3[0-9]{2}$) ]]; then
     echo "下载地址检查OK，继续！"
   else
     echo "下载地址检查出错，退出！"
     exit 1
   fi
 }
+
 
 #cn使用fastgit.org的github加速
 check_cn() {
