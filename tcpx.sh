@@ -88,6 +88,7 @@ check_cn() {
   # 检查是否安装了jq命令，如果没有安装则进行安装
   if ! command -v jq >/dev/null 2>&1; then
     if command -v yum >/dev/null 2>&1; then
+      sudo yum install epel-release -y
       sudo yum install -y jq
     elif command -v apt-get >/dev/null 2>&1; then
       sudo apt-get update
