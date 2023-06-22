@@ -74,7 +74,7 @@ checkurl() {
   fi
 
   local responseCode=$(curl -s -L -m 10 --retry 3 --retry-delay 2 --connect-timeout 10 -o /dev/null -w "%{http_code}" "$url")
-
+  echo "响应代码为"$responseCode",临时测试数据,请忽略"
   if [[ "$responseCode" =~ ^(200|3[0-9]{2})$ ]]; then
     echo "下载地址检查OK，继续！"
   else
