@@ -1655,6 +1655,7 @@ check_sys() {
       echo "lsb_release 已安装"
     else
       echo "lsb_release 未安装，现在开始安装..."
+      yum install epel-release -y
       yum install redhat-lsb-core -y
     fi
 
