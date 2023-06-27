@@ -1903,7 +1903,7 @@ check_sys_official_xanmod() {
   wget -N -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
   chmod +x check_x86-64_psabi.sh
   cpu_level=$(./check_x86-64_psabi.sh | awk -F 'v' '{print $2}')
-  echo ${Green_font_prefix} " CPU supports x86-64-v" ${cpu_level}${Font_color_suffix}
+  echo -e "CPU supports \033[32m${cpu_level}\033[0m"
   # exit
   if [[ ${bit} != "x86_64" ]]; then
     echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
@@ -1937,7 +1937,7 @@ check_sys_official_xanmod_lts() {
   wget -N -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
   chmod +x check_x86-64_psabi.sh
   cpu_level=$(./check_x86-64_psabi.sh | awk -F 'v' '{print $2}')
-  echo ${Green_font_prefix} " CPU supports x86-64-v" ${cpu_level}${Font_color_suffix}
+  echo -e "CPU supports \033[32m${cpu_level}\033[0m"
   # exit
   if [[ ${bit} != "x86_64" ]]; then
     echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
