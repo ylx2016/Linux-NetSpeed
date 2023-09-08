@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.1.25
+#	Version: 100.0.1.26
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.1.25"
+sh_ver="100.0.1.26"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -1190,7 +1190,7 @@ start_menu() {
  ${Green_font_prefix}9.${Font_color_suffix} 切换到卸载内核版本		${Green_font_prefix}10.${Font_color_suffix} 切换到一键DD系统脚本
  ${Green_font_prefix}1.${Font_color_suffix} 安装 BBR原版内核		${Green_font_prefix}7.${Font_color_suffix} 安装 Zen官方版内核
  ${Green_font_prefix}2.${Font_color_suffix} 安装 BBRplus版内核		${Green_font_prefix}5.${Font_color_suffix} 安装 BBRplus新版内核
- ${Green_font_prefix}3.${Font_color_suffix} 安装 Lotserver(锐速)内核
+ ${Green_font_prefix}3.${Font_color_suffix} 安装 Lotserver(锐速)内核	${Green_font_prefix}36.${Font_color_suffix} 安装 XANMOD官方内核(EDGE)
  ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核		${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核 backports/elrepo
  ${Green_font_prefix}32.${Font_color_suffix} 安装 XANMOD官方内核(main)	${Green_font_prefix}33.${Font_color_suffix} 安装 XANMOD官方内核(LTS)
  ${Green_font_prefix}11.${Font_color_suffix} 使用BBR+FQ加速		${Green_font_prefix}12.${Font_color_suffix} 使用BBR+FQ_PIE加速 
@@ -1242,11 +1242,14 @@ start_menu() {
     check_sys_official_bbr
     ;;
   32)
-    check_sys_official_xanmod
+    check_sys_official_xanmod_main
     ;;
   33)
     check_sys_official_xanmod_lts
     ;;
+  36)
+    check_sys_official_xanmod_edge
+    ;;    
   9)
     gototcp
     ;;
@@ -1897,8 +1900,8 @@ check_sys_official_bbr() {
   echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
-#检查官方xanmod内核并安装
-check_sys_official_xanmod() {
+#检查官方xanmod main内核并安装 
+check_sys_official_xanmod_main() {
   check_version
   wget -N -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
   chmod +x check_x86-64_psabi.sh
@@ -1956,6 +1959,40 @@ check_sys_official_xanmod_lts() {
       apt update && apt install linux-xanmod-lts-x64v2 -y
     else
       apt update && apt install linux-xanmod-lts-x64v1 -y
+    fi
+  else
+    echo -e "${Error} 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+  fi
+
+  BBR_grub
+  echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
+}
+
+#检查官方xanmod lts内核并安装
+check_sys_official_xanmod_edge() {
+  check_version
+  wget -N -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
+  chmod +x check_x86-64_psabi.sh
+  cpu_level=$(./check_x86-64_psabi.sh | awk -F 'v' '{print $2}')
+  echo -e "CPU supports \033[32m${cpu_level}\033[0m"
+  # exit
+  if [[ ${bit} != "x86_64" ]]; then
+    echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+  fi
+
+  if [[ "${OS_type}" == "Debian" ]]; then
+    apt update
+    apt-get install gnupg gnupg2 gnupg1 sudo -y
+    echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
+    wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
+	if [[ "${cpu_level}" == "4" ]]; then
+      apt update && apt install linux-xanmod-edge-x64v4 -y
+    elif [[ "${cpu_level}" == "3" ]]; then
+      apt update && apt install linux-xanmod-edge-x64v3 -y
+    elif [[ "${cpu_level}" == "2" ]]; then
+      apt update && apt install linux-xanmod-edge-x64v2 -y
+    else
+      apt update && apt install linux-xanmod-edge-x64v1 -y
     fi
   else
     echo -e "${Error} 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
