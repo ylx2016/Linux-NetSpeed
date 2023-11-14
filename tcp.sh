@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.2.2
+#	Version: 100.0.2.3
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.2.2"
+sh_ver="100.0.2.3"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -170,7 +170,7 @@ download_file() {
   url="$1"
   filename="$2"
 
-  wget -N "$url" -O "$filename"
+  wget "$url" -O "$filename"
   status=$?
 
   if [ $status -eq 0 ]; then
@@ -326,8 +326,8 @@ installbbrplus() {
       headurl=$(check_cn $headurl)
       imgurl=$(check_cn $imgurl)
 
-      wget -N -O linux-headers.deb $headurl
-      wget -N -O linux-image.deb $imgurl
+      wget -O linux-headers.deb $headurl
+      wget -O linux-image.deb $imgurl
 
       dpkg -i linux-image.deb
       dpkg -i linux-headers.deb
@@ -516,8 +516,8 @@ installxanmod() {
       headurl=$(check_cn $headurl)
       imgurl=$(check_cn $imgurl)
 
-      wget -N -O kernel-headers-c8.rpm $headurl
-      wget -N -O kernel-c8.rpm $imgurl
+      wget -O kernel-headers-c8.rpm $headurl
+      wget -O kernel-c8.rpm $imgurl
       yum install -y kernel-c8.rpm
       yum install -y kernel-headers-c8.rpm
     fi
@@ -603,8 +603,8 @@ installbbrplusnew() {
         headurl=$(check_cn $headurl)
         imgurl=$(check_cn $imgurl)
 
-        wget -N -O kernel-c7.rpm $headurl
-        wget -N -O kernel-headers-c7.rpm $imgurl
+        wget -O kernel-c7.rpm $headurl
+        wget -O kernel-headers-c7.rpm $imgurl
         yum install -y kernel-c7.rpm
         yum install -y kernel-headers-c7.rpm
       else
@@ -624,8 +624,8 @@ installbbrplusnew() {
         headurl=$(check_cn $headurl)
         imgurl=$(check_cn $imgurl)
 
-        wget -N -O kernel-c8.rpm $headurl
-        wget -N -O kernel-headers-c8.rpm $imgurl
+        wget -O kernel-c8.rpm $headurl
+        wget -O kernel-headers-c8.rpm $imgurl
         yum install -y kernel-c8.rpm
         yum install -y kernel-headers-c8.rpm
       else
