@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.2.1
+#	Version: 100.0.2.2
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.2.1"
+sh_ver="100.0.2.2"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -121,15 +121,26 @@ check_cn() {
   country=$(echo "$response" | jq -r '.countryCode')
   if [[ "$country" == "CN" ]]; then
     local suffixes=(
-      "https://ghproxy.crazypeace.workers.dev/"
       "https://ghproxy.agrayman.gay/"
       "https://ghproxy.crazypeace.repl.co/"
       "https://ghproxy–crazypeace.repl.co/"
       "https://gh.h233.eu.org/"
       "https://gh.con.sh/"
-      "https://ghproxy.com/"
       "https://gh-proxy.com/"
+      "https://github.jobcher.com/gh/"
+      "https://mirror.ghproxy.com/"
+      "https://ghps.cc/"
+      "https://gh.api.99988866.xyz/"
+      "https://git.886.be/"
+      "https://hub.gitmirror.com/"
+      "https://gh.ddlc.top/"
+      "https://github.xkl.me/"
+      "https://slink.ltd/"
+      "https://github.moeyy.xyz/"
+      "https://github.cooluc.com/"
+      "https://gh.isteed.cc/"
       "https://endpoint.fastgit.org/"
+      "https://ghproxy.crazypeace.workers.dev/"
     )
 
     # 循环遍历每个后缀并测试组合的链接
@@ -138,7 +149,7 @@ check_cn() {
       combined_url="$suffix$1"
 
       # 使用 curl -I 获取头部信息，提取状态码
-      local response_code=$(curl --max-time 5 -sL -w "%{http_code}" -I "$combined_url" | head -n 1 | awk '{print $2}')
+      local response_code=$(curl --max-time 2 -sL -w "%{http_code}" -I "$combined_url" | head -n 1 | awk '{print $2}')
 
       # 检查响应码是否表示成功 (2xx)
       if [[ $response_code -ge 200 && $response_code -lt 300 ]]; then
@@ -1277,7 +1288,7 @@ start_menu() {
     ;;
   36)
     check_sys_official_xanmod_edge
-    ;;    
+    ;;
   9)
     gototcp
     ;;
@@ -1928,7 +1939,7 @@ check_sys_official_bbr() {
   echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
-#检查官方xanmod main内核并安装 
+#检查官方xanmod main内核并安装
 check_sys_official_xanmod_main() {
   check_version
   wget -N -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
@@ -1945,7 +1956,7 @@ check_sys_official_xanmod_main() {
     apt-get install gnupg gnupg2 gnupg1 sudo -y
     echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
     wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
-	if [[ "${cpu_level}" == "4" ]]; then
+    if [[ "${cpu_level}" == "4" ]]; then
       apt update && apt install linux-xanmod-x64v4 -y
     elif [[ "${cpu_level}" == "3" ]]; then
       apt update && apt install linux-xanmod-x64v3 -y
@@ -1979,7 +1990,7 @@ check_sys_official_xanmod_lts() {
     apt-get install gnupg gnupg2 gnupg1 sudo -y
     echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
     wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
-	if [[ "${cpu_level}" == "4" ]]; then
+    if [[ "${cpu_level}" == "4" ]]; then
       apt update && apt install linux-xanmod-lts-x64v4 -y
     elif [[ "${cpu_level}" == "3" ]]; then
       apt update && apt install linux-xanmod-lts-x64v3 -y
@@ -2013,7 +2024,7 @@ check_sys_official_xanmod_edge() {
     apt-get install gnupg gnupg2 gnupg1 sudo -y
     echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
     wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
-	if [[ "${cpu_level}" == "4" ]]; then
+    if [[ "${cpu_level}" == "4" ]]; then
       apt update && apt install linux-xanmod-edge-x64v4 -y
     elif [[ "${cpu_level}" == "3" ]]; then
       apt update && apt install linux-xanmod-edge-x64v3 -y
