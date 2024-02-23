@@ -194,6 +194,21 @@ check_empty() {
 
 #检查磁盘空间
 check_disk_space() {
+    # 检查是否存在 bc 命令
+    if ! command -v bc &> /dev/null; then
+        echo "安装 bc 命令..."
+        # 检查系统类型并安装相应的 bc 包
+        if [ -f /etc/redhat-release ]; then
+            yum install -y bc
+        elif [ -f /etc/debian_version ]; then
+            apt-get update
+            apt-get install -y bc
+        else
+            echo "无法确定系统类型，请手动安装 bc 命令。"
+            return 1
+        fi
+    fi
+
     # 获取当前磁盘剩余空间
     available_space=$(df -h / | awk 'NR==2 {print $4}')
 
@@ -207,7 +222,6 @@ check_disk_space() {
         echo "当前磁盘剩余空间：$available_space GB"
     fi
 }
-
 
 #安装BBR内核
 installbbr() {
