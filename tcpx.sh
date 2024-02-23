@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.2.4
+#	Version: 100.0.2.5
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.2.4"
+sh_ver="100.0.2.5"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -191,6 +191,23 @@ check_empty() {
     exit 1
   fi
 }
+
+#检查磁盘空间
+check_disk_space() {
+    # 获取当前磁盘剩余空间
+    available_space=$(df -h / | awk 'NR==2 {print $4}')
+
+    # 移除单位字符，例如"GB"，并将剩余空间转换为数字
+    available_space=$(echo $available_space | sed 's/G//')
+
+    # 如果剩余空间小于等于0，则输出警告信息
+    if [ $(echo "$available_space <= 0" | bc) -eq 1 ]; then
+        echo "警告：磁盘空间已用尽，请勿重启，先清理空间。"
+    else
+        echo "当前磁盘剩余空间：$available_space GB"
+    fi
+}
+
 
 #安装BBR内核
 installbbr() {
@@ -1498,6 +1515,7 @@ BBR_grub() {
     fi
     #exit 1
   fi
+ check_disk_space
 }
 
 #简单的检查内核
