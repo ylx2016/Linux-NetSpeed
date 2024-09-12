@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.2.6
+#	Version: 100.0.2.7
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.2.6"
+sh_ver="100.0.2.7"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -121,26 +121,22 @@ check_cn() {
   country=$(echo "$response" | jq -r '.countryCode')
   if [[ "$country" == "CN" ]]; then
     local suffixes=(
-      "https://ghproxy.agrayman.gay/"
-      "https://ghproxy.crazypeace.repl.co/"
-      "https://ghproxy–crazypeace.repl.co/"
-      "https://gh.h233.eu.org/"
       "https://gh.con.sh/"
       "https://gh-proxy.com/"
-      "https://github.jobcher.com/gh/"
+      "https://ghp.ci/"
+      "https://gh.m-l.cc/"
+      "https://down.npee.cn/?"
       "https://mirror.ghproxy.com/"
       "https://ghps.cc/"
       "https://gh.api.99988866.xyz/"
       "https://git.886.be/"
       "https://hub.gitmirror.com/"
+	  "https://pd.zwc365.com/"
       "https://gh.ddlc.top/"
-      "https://github.xkl.me/"
       "https://slink.ltd/"
       "https://github.moeyy.xyz/"
-      "https://github.cooluc.com/"
-      "https://gh.isteed.cc/"
-      "https://endpoint.fastgit.org/"
       "https://ghproxy.crazypeace.workers.dev/"
+	  "https://gh.h233.eu.org/"
     )
 
     # 循环遍历每个后缀并测试组合的链接
@@ -1212,13 +1208,15 @@ Update_Shell() {
 #切换到不卸载内核版本
 gototcpx() {
   clear
-  wget -O tcpx.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcpx.sh" && chmod +x tcpx.sh && ./tcpx.sh
+  #wget -O tcpx.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcpx.sh" && chmod +x tcpx.sh && ./tcpx.sh
+  bash <(wget -qO- https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcpx.sh)
 }
 
 #切换到秋水逸冰BBR安装脚本
 gototeddysun_bbr() {
   clear
-  wget https://github.com/teddysun/across/raw/master/bbr.sh && chmod +x bbr.sh && ./bbr.sh
+  #wget https://github.com/teddysun/across/raw/master/bbr.sh && chmod +x bbr.sh && ./bbr.sh
+  bash <(wget -qO- https://github.com/teddysun/across/raw/master/bbr.sh)
 }
 
 #切换到一键DD安装系统脚本 新手勿入
@@ -1226,7 +1224,8 @@ gotodd() {
   clear
   echo DD使用git.beta.gs的脚本，知悉
   sleep 1.5
-  wget -O NewReinstall.sh https://github.com/fcurrk/reinstall/raw/master/NewReinstall.sh && chmod a+x NewReinstall.sh && bash NewReinstall.sh
+  #wget -O NewReinstall.sh https://github.com/fcurrk/reinstall/raw/master/NewReinstall.sh && chmod a+x NewReinstall.sh && bash NewReinstall.sh
+  bash <(wget -qO- https://github.com/fcurrk/reinstall/raw/master/NewReinstall.sh)
   #wget -qO ~/Network-Reinstall-System-Modify.sh 'https://github.com/ylx2016/reinstall/raw/master/Network-Reinstall-System-Modify.sh' && chmod a+x ~/Network-Reinstall-System-Modify.sh && bash ~/Network-Reinstall-System-Modify.sh -UI_Options
 }
 
