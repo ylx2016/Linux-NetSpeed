@@ -331,9 +331,11 @@ while [ $# -gt 0 ]; do
     case $1 in
         op)
             optimizing_system  # 调用函数
+			exit
             ;;
         op2)
             optimizing_system_johnrosen1  # 调用函数
+			exit
             ;;
         *)
             err "未知选项: \"$1\""
