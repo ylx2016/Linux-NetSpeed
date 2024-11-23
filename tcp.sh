@@ -1300,7 +1300,7 @@ start_menu() {
  ${Green_font_prefix}3.${Font_color_suffix} 安装 Lotserver(锐速)内核
  ${Green_font_prefix}11.${Font_color_suffix} 使用BBR+FQ加速		${Green_font_prefix}12.${Font_color_suffix} 使用BBR+FQ_PIE加速
  ${Green_font_prefix}13.${Font_color_suffix} 使用BBR+CAKE加速		${Green_font_prefix}14.${Font_color_suffix} 使用BBR2+FQ加速
- ${Green_font_prefix}15.${Font_color_suffix} 使用BBR2+FQ_PIE加速 ${Green_font_prefix}16.${Font_color_suffix} 使用BBR2+CAKE加速
+ ${Green_font_prefix}15.${Font_color_suffix} 使用BBR2+FQ_PIE加速		${Green_font_prefix}16.${Font_color_suffix} 使用BBR2+CAKE加速
  ${Green_font_prefix}17.${Font_color_suffix} 开启ECN	 		${Green_font_prefix}18.${Font_color_suffix} 关闭ECN
  ${Green_font_prefix}19.${Font_color_suffix} 使用BBRplus+FQ版加速 
  ${Green_font_prefix}20.${Font_color_suffix} 使用Lotserver(锐速)加速 
