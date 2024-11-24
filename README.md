@@ -30,6 +30,9 @@ wget -O tcp.sh "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && 
 
 尝试加入参数直接调用优化 ./tcpx.sh op或者./tcpx.sh op2  (不会判断系统)
 
+ip质检
+bash <(curl -Ls IP.Check.Place)
+
 双持bbr+锐速
 <br>
 bbr 添加
