@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.2.10
+#	Version: 100.0.3.1
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.2.10"
+sh_ver="100.0.3.1"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -323,25 +323,25 @@ EOF
 
 #处理传进来的参数 直接优化
 err() {
-    echo "错误: $1"
-    exit 1
+  echo "错误: $1"
+  exit 1
 }
 
 while [ $# -gt 0 ]; do
-    case $1 in
-        op)
-            optimizing_system  # 调用函数
-			exit
-            ;;
-        op2)
-            optimizing_system_johnrosen1  # 调用函数
-			exit
-            ;;
-        *)
-            err "未知选项: \"$1\""
-            ;;
-    esac
-    shift  # 移动到下一个参数
+  case $1 in
+  op)
+    optimizing_system # 调用函数
+    exit
+    ;;
+  op2)
+    optimizing_system_johnrosen1 # 调用函数
+    exit
+    ;;
+  *)
+    err "未知选项: \"$1\""
+    ;;
+  esac
+  shift # 移动到下一个参数
 done
 
 # 检查github网络
@@ -436,12 +436,12 @@ check_cn() {
       "https://gh.api.99988866.xyz/"
       "https://git.886.be/"
       "https://hub.gitmirror.com/"
-	  "https://pd.zwc365.com/"
+      "https://pd.zwc365.com/"
       "https://gh.ddlc.top/"
       "https://slink.ltd/"
       "https://github.moeyy.xyz/"
       "https://ghproxy.crazypeace.workers.dev/"
-	  "https://gh.h233.eu.org/"
+      "https://gh.h233.eu.org/"
     )
 
     # 循环遍历每个后缀并测试组合的链接
@@ -495,33 +495,33 @@ check_empty() {
 
 #检查磁盘空间
 check_disk_space() {
-    # 检查是否存在 bc 命令
-    if ! command -v bc &> /dev/null; then
-        echo "安装 bc 命令..."
-        # 检查系统类型并安装相应的 bc 包
-        if [ -f /etc/redhat-release ]; then
-            yum install -y bc
-        elif [ -f /etc/debian_version ]; then
-            apt-get update
-            apt-get install -y bc
-        else
-            echo "无法确定系统类型，请手动安装 bc 命令。"
-            return 1
-        fi
-    fi
-
-    # 获取当前磁盘剩余空间
-    available_space=$(df -h / | awk 'NR==2 {print $4}')
-
-    # 移除单位字符，例如"GB"，并将剩余空间转换为数字
-    available_space=$(echo $available_space | sed 's/G//')
-
-    # 如果剩余空间小于等于0，则输出警告信息
-    if [ $(echo "$available_space <= 0" | bc) -eq 1 ]; then
-        echo "警告：磁盘空间已用尽，请勿重启，先清理空间。建议先卸载刚才安装的内核来释放空间，仅供参考。"
+  # 检查是否存在 bc 命令
+  if ! command -v bc &>/dev/null; then
+    echo "安装 bc 命令..."
+    # 检查系统类型并安装相应的 bc 包
+    if [ -f /etc/redhat-release ]; then
+      yum install -y bc
+    elif [ -f /etc/debian_version ]; then
+      apt-get update
+      apt-get install -y bc
     else
-        echo "当前磁盘剩余空间：$available_space GB"
+      echo "无法确定系统类型，请手动安装 bc 命令。"
+      return 1
     fi
+  fi
+
+  # 获取当前磁盘剩余空间
+  available_space=$(df -h / | awk 'NR==2 {print $4}')
+
+  # 移除单位字符，例如"GB"，并将剩余空间转换为数字
+  available_space=$(echo $available_space | sed 's/G//')
+
+  # 如果剩余空间小于等于0，则输出警告信息
+  if [ $(echo "$available_space <= 0" | bc) -eq 1 ]; then
+    echo "警告：磁盘空间已用尽，请勿重启，先清理空间。建议先卸载刚才安装的内核来释放空间，仅供参考。"
+  else
+    echo "当前磁盘剩余空间：$available_space GB"
+  fi
 }
 
 #安装BBR内核
@@ -546,9 +546,9 @@ installbbr() {
         #imgurl=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep -v 'headers' | grep -v 'devel' | awk -F '"' '{print $4}')
         #headurl=https://github.com/ylx2016/kernel/releases/download/$github_tag/kernel-headers-${github_ver}-1.x86_64.rpm
         #imgurl=https://github.com/ylx2016/kernel/releases/download/$github_tag/kernel-${github_ver}-1.x86_64.rpm
-		
-		headurl=https://github.com/ylx2016/kernel/releases/download/Centos_Kernel_6.1.35_latest_bbr_2023.06.22-0855/kernel-headers-6.1.35-1.x86_64.rpm	
-		imgurl=https://github.com/ylx2016/kernel/releases/download/Centos_Kernel_6.1.35_latest_bbr_2023.06.22-0855/kernel-6.1.35-1.x86_64.rpm
+
+        headurl=https://github.com/ylx2016/kernel/releases/download/Centos_Kernel_6.1.35_latest_bbr_2023.06.22-0855/kernel-headers-6.1.35-1.x86_64.rpm
+        imgurl=https://github.com/ylx2016/kernel/releases/download/Centos_Kernel_6.1.35_latest_bbr_2023.06.22-0855/kernel-6.1.35-1.x86_64.rpm
 
         check_empty $imgurl
         headurl=$(check_cn $headurl)
@@ -803,9 +803,9 @@ installxanmod() {
         #imgurl=$(curl -s 'https://api.github.com/repos/ylx2016/kernel/releases' | grep ${github_tag} | grep 'rpm' | grep -v 'headers' | grep -v 'devel' | awk -F '"' '{print $4}')
 
         headurl=https://github.com/ylx2016/kernel/releases/download/Centos_Kernel_5.15.95-xanmod1_lts_latest_2023.02.24-2159/kernel-headers-5.15.95_xanmod1-1.x86_64.rpm
-		imgurl=https://github.com/ylx2016/kernel/releases/download/Centos_Kernel_5.15.95-xanmod1_lts_latest_2023.02.24-2159/kernel-5.15.95_xanmod1-1.x86_64.rpm
+        imgurl=https://github.com/ylx2016/kernel/releases/download/Centos_Kernel_5.15.95-xanmod1_lts_latest_2023.02.24-2159/kernel-5.15.95_xanmod1-1.x86_64.rpm
 
-		check_empty $imgurl
+        check_empty $imgurl
         headurl=$(check_cn $headurl)
         imgurl=$(check_cn $imgurl)
 
@@ -982,6 +982,124 @@ installbbrplusnew() {
 
   cd .. && rm -rf bbrplusnew
   BBR_grub
+  echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
+  check_kernel
+
+}
+
+#安装cloud内核
+installcloud() {
+
+  # 检查当前系统发行版
+  local DISTRO=$(grep -oP '(?<=^ID=).+' /etc/os-release | tr -d '"')
+  local ARCH=$(uname -m)
+  local VERSIONS=()
+  local VERSION_MAP_FILE="/tmp/version_map.txt"
+  local HEADERS_MAP_FILE="/tmp/headers_map.txt"
+
+  # 检查架构并设置 IMAGE_URL 和 HEADERS_PATTERN
+  local IMAGE_URL
+  local IMAGE_PATTERN
+  local HEADER_PATTERN
+  if [ "$ARCH" == "x86_64" ]; then
+    IMAGE_URL="https://deb.debian.org/debian/pool/main/l/linux-signed-amd64/"
+    IMAGE_PATTERN='linux-image-[^"]+cloud-amd64_[^"]+_amd64\.deb'
+    HEADER_PATTERN='linux-headers-[^"]+cloud-amd64_[^"]+_amd64\.deb'
+  elif [ "$ARCH" == "aarch64" ]; then
+    IMAGE_URL="https://deb.debian.org/debian/pool/main/l/linux-signed-arm64/"
+    IMAGE_PATTERN='linux-image-[^"]+cloud-arm64_[^"]+_arm64\.deb'
+    HEADER_PATTERN='linux-headers-[^"]+cloud-arm64_[^"]+_arm64\.deb'
+  else
+    echo "不支持的架构：$ARCH，仅支持 x86_64 和 aarch64"
+    exit 1
+  fi
+
+  echo "检测到架构 $ARCH，正在从官方源获取cloud内核版本..."
+
+  # 获取 cloud 内核 .deb 文件列表
+  local DEB_FILES_RAW=$(curl -s "$IMAGE_URL" | grep -oP "$IMAGE_PATTERN")
+  # 获取 headers 文件列表，根据架构筛选
+  local HEADER_FILES_RAW=$(curl -s https://deb.debian.org/debian/pool/main/l/linux/ | grep -oP "$HEADER_PATTERN")
+
+  # 清空临时映射文件
+  >"$VERSION_MAP_FILE"
+  >"$HEADERS_MAP_FILE"
+
+  # 提取 image 版本号并写入映射文件
+  while IFS= read -r file; do
+    if [[ "$file" =~ linux-image-([0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9]+)?) ]]; then
+      local ver="${BASH_REMATCH[1]}"
+      echo "$ver:$file" >>"$VERSION_MAP_FILE"
+    fi
+  done <<<"$DEB_FILES_RAW"
+
+  # 提取 headers 版本号并写入映射文件
+  while IFS= read -r file; do
+    if [[ "$file" =~ linux-headers-([0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9]+)?) ]]; then
+      local ver="${BASH_REMATCH[1]}"
+      echo "$ver:$file" >>"$HEADERS_MAP_FILE"
+    fi
+  done <<<"$HEADER_FILES_RAW"
+
+  # 读取排序并去重后的版本号
+  mapfile -t VERSIONS < <(cut -d':' -f1 "$VERSION_MAP_FILE" | sort -V -u)
+
+  # 确保有可用版本
+  if [ ${#VERSIONS[@]} -eq 0 ]; then
+    echo "未找到可用的cloud内核版本，请检查网络或反馈。"
+    exit 1
+  fi
+
+  echo "检测到 $DISTRO 系统（架构 $ARCH），以下是从 Debian 签名cloud内核列表中获取的版本（按从小到大排序，已去重）："
+  for i in "${!VERSIONS[@]}"; do
+    echo "  $i) [${VERSIONS[$i]}]"
+  done
+
+  # 默认选择最新版本
+  local DEFAULT_INDEX=$((${#VERSIONS[@]} - 1))
+  echo "请选择要安装的cloud内核版本（8秒后默认选择最新版本 ${VERSIONS[$DEFAULT_INDEX]}）："
+  read -t 8 -p "输入选项编号: " CHOICE
+  CHOICE=${CHOICE:-$DEFAULT_INDEX}
+
+  # 验证输入
+  if [[ ! "$CHOICE" =~ ^[0-9]+$ ]] || [ "$CHOICE" -lt 0 ] || [ "$CHOICE" -ge "${#VERSIONS[@]}" ]; then
+    echo "无效选项，默认安装最新版本 ${VERSIONS[$DEFAULT_INDEX]}..."
+    CHOICE=$DEFAULT_INDEX
+  fi
+
+  local SELECTED_VERSION="${VERSIONS[$CHOICE]}"
+  local IMAGE_DEB_FILE=$(grep "^$SELECTED_VERSION:" "$VERSION_MAP_FILE" | tail -n 1 | cut -d':' -f2)
+  local HEADER_DEB_FILE=$(grep "^$SELECTED_VERSION:" "$HEADERS_MAP_FILE" | tail -n 1 | cut -d':' -f2)
+
+  kernel_version=$SELECTED_VERSION
+
+  # 检查是否找到匹配的 headers 文件
+  if [ -z "$HEADER_DEB_FILE" ]; then
+    echo "警告：未找到版本 $SELECTED_VERSION 的 headers 文件（架构 $ARCH），将只安装内核镜像"
+  fi
+
+  # headers URL 不区分架构
+  local HEADER_URL="https://deb.debian.org/debian/pool/main/l/linux/"
+
+  # 下载并安装 headers（如果存在）
+  if [ -n "$HEADER_DEB_FILE" ]; then
+    echo "正在下载 $HEADER_URL$HEADER_DEB_FILE ..."
+    curl -O "$HEADER_URL$HEADER_DEB_FILE"
+    echo "正在安装 $HEADER_DEB_FILE ..."
+    sudo dpkg -i "$HEADER_DEB_FILE"
+    sudo apt-get install -f -y # 解决可能的依赖问题
+  fi
+
+  # 下载并安装 image
+  echo "正在下载 $IMAGE_URL$IMAGE_DEB_FILE ..."
+  curl -O "$IMAGE_URL$IMAGE_DEB_FILE"
+  echo "正在安装 $IMAGE_DEB_FILE ..."
+  sudo dpkg -i "$IMAGE_DEB_FILE"
+  sudo apt-get install -f -y # 解决可能的依赖问题
+
+  # 清理下载的文件
+  rm -f "$IMAGE_DEB_FILE" "$HEADER_DEB_FILE" "$VERSION_MAP_FILE" "$HEADERS_MAP_FILE"
+
   echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
   check_kernel
 
@@ -1187,8 +1305,6 @@ remove_all() {
   sleep 1s
 }
 
-
-
 optimizing_ddcc() {
   sed -i '/net.ipv4.conf.all.rp_filter/d' /etc/sysctl.d/99-sysctl.conf
   sed -i '/net.ipv4.tcp_syncookies/d' /etc/sysctl.d/99-sysctl.conf
@@ -1257,7 +1373,7 @@ gotoipcheck() {
   clear
   sleep 1.5
   bash <(wget -qO- https://raw.githubusercontent.com/xykt/IPQuality/main/ip.sh)
-  #bash <(wget -qO- https://IP.Check.Place) 
+  #bash <(wget -qO- https://IP.Check.Place)
 }
 
 #禁用IPv6
@@ -1309,6 +1425,7 @@ start_menu() {
  ${Green_font_prefix}2.${Font_color_suffix} 安装 BBRplus版内核		${Green_font_prefix}5.${Font_color_suffix} 安装 BBRplus新版内核
  ${Green_font_prefix}3.${Font_color_suffix} 安装 Lotserver(锐速)内核	${Green_font_prefix}36.${Font_color_suffix} 安装 XANMOD官方内核(EDGE)
  ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核		${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核 backports/elrepo
+ ${Green_font_prefix}8.${Font_color_suffix} 安装 官方cloud内核 (支持debian系列)
  ${Green_font_prefix}32.${Font_color_suffix} 安装 XANMOD官方内核(main)	${Green_font_prefix}33.${Font_color_suffix} 安装 XANMOD官方内核(LTS)
  ${Green_font_prefix}11.${Font_color_suffix} 使用BBR+FQ加速		${Green_font_prefix}12.${Font_color_suffix} 使用BBR+FQ_PIE加速 
  ${Green_font_prefix}13.${Font_color_suffix} 使用BBR+CAKE加速		${Green_font_prefix}14.${Font_color_suffix} 使用BBR2+FQ加速
@@ -1351,6 +1468,9 @@ start_menu() {
   7)
     check_sys_official_zen
     ;;
+  8)
+    check_sys_cloud
+    ;;
   30)
     check_sys_official
     ;;
@@ -1374,7 +1494,7 @@ start_menu() {
     ;;
   60)
     gotoipcheck
-    ;;	
+    ;;
   11)
     startbbrfq
     ;;
@@ -1577,7 +1697,7 @@ BBR_grub() {
     fi
     #exit 1
   fi
- check_disk_space
+  check_disk_space
 }
 
 #简单的检查内核
@@ -1868,6 +1988,16 @@ check_sys_xanmod() {
     installxanmod
   else
     echo -e "${Error} xanmod内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+  fi
+}
+
+check_sys_cloud() {
+  check_version
+  if [[ "${OS_type}" == "Debian" ]]; then
+    apt-get --fix-broken install -y && apt-get autoremove -y
+    installcloud
+  else
+    echo -e "${Error} cloud内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
   fi
 }
 
