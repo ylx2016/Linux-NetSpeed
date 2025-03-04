@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.3.1
+#	Version: 100.0.3.2
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.3.1"
+sh_ver="100.0.3.2"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -768,7 +768,7 @@ installcloud() {
 
   # 默认选择最新版本
   local DEFAULT_INDEX=$((${#VERSIONS[@]} - 1))
-  echo "请选择要安装的cloud内核版本（8秒后默认选择最新版本 ${VERSIONS[$DEFAULT_INDEX]}）："
+  echo "请选择要安装的cloud内核版本（8秒后默认选择最新版本回车加速 ${VERSIONS[$DEFAULT_INDEX]}）："
   read -t 8 -p "输入选项编号: " CHOICE
   CHOICE=${CHOICE:-$DEFAULT_INDEX}
 
@@ -785,21 +785,22 @@ installcloud() {
   kernel_version=$SELECTED_VERSION
 
   # 检查是否找到匹配的 headers 文件
-  if [ -z "$HEADER_DEB_FILE" ]; then
-    echo "警告：未找到版本 $SELECTED_VERSION 的 headers 文件（架构 $ARCH），将只安装内核镜像"
-  fi
+  # if [ -z "$HEADER_DEB_FILE" ]; then
+  #   echo "警告：未找到版本 $SELECTED_VERSION 的 headers 文件（架构 $ARCH），将只安装内核镜像"
+  # fi
 
   # headers URL 不区分架构
   local HEADER_URL="https://deb.debian.org/debian/pool/main/l/linux/"
 
   # 下载并安装 headers（如果存在）
-  if [ -n "$HEADER_DEB_FILE" ]; then
-    echo "正在下载 $HEADER_URL$HEADER_DEB_FILE ..."
-    curl -O "$HEADER_URL$HEADER_DEB_FILE"
-    echo "正在安装 $HEADER_DEB_FILE ..."
-    sudo dpkg -i "$HEADER_DEB_FILE"
-    sudo apt-get install -f -y # 解决可能的依赖问题
-  fi
+  # if [ -n "$HEADER_DEB_FILE" ]; then
+  #   echo "正在下载 $HEADER_URL$HEADER_DEB_FILE ..."
+  #   curl -O "$HEADER_URL$HEADER_DEB_FILE"
+  #   echo "正在安装 $HEADER_DEB_FILE ..."
+  #   sudo dpkg -i "$HEADER_DEB_FILE"
+  #   sudo apt-get install -f -y # 解决可能的依赖问题
+  # fi
+  echo "不安装下载安装headers节省体积，需要headers的请选择其他内核或者我听大家意见，headers依赖有几个组件！"
 
   # 下载并安装 image
   echo "正在下载 $IMAGE_URL$IMAGE_DEB_FILE ..."
