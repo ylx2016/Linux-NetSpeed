@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.3.2
+#	Version: 100.0.4.1
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.3.2"
+sh_ver="100.0.4.1"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -39,6 +39,524 @@ if [ "$EUID" -ne 0 ]; then
   exit
 fi
 
+#优化系统配置
+optimizing_system_old() {
+  if [ ! -f "/etc/sysctl.d/99-sysctl.conf" ]; then
+    touch /etc/sysctl.d/99-sysctl.conf
+  fi
+  sed -i '/net.ipv4.tcp_retries2/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_slow_start_after_idle/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_fastopen/d' /etc/sysctl.conf
+  sed -i '/fs.file-max/d' /etc/sysctl.conf
+  sed -i '/fs.inotify.max_user_instances/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_syncookies/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_fin_timeout/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_tw_reuse/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_max_syn_backlog/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.ip_local_port_range/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_max_tw_buckets/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.route.gc_timeout/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_synack_retries/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_syn_retries/d' /etc/sysctl.conf
+  sed -i '/net.core.somaxconn/d' /etc/sysctl.conf
+  sed -i '/net.core.netdev_max_backlog/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_timestamps/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.tcp_max_orphans/d' /etc/sysctl.conf
+  sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf
+
+  echo "net.ipv4.tcp_retries2 = 8
+net.ipv4.tcp_slow_start_after_idle = 0
+fs.file-max = 1000000
+fs.inotify.max_user_instances = 8192
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.ip_local_port_range = 1024 65000
+net.ipv4.tcp_max_syn_backlog = 16384
+net.ipv4.tcp_max_tw_buckets = 6000
+net.ipv4.route.gc_timeout = 100
+net.ipv4.tcp_syn_retries = 1
+net.ipv4.tcp_synack_retries = 1
+net.core.somaxconn = 32768
+net.core.netdev_max_backlog = 32768
+net.ipv4.tcp_timestamps = 0
+net.ipv4.tcp_max_orphans = 32768
+# forward ipv4
+#net.ipv4.ip_forward = 1" >>/etc/sysctl.d/99-sysctl.conf
+  sysctl -p
+  echo "*               soft    nofile           1000000
+*               hard    nofile          1000000" >/etc/security/limits.conf
+  echo "ulimit -SHn 1000000" >>/etc/profile
+  read -p "需要重启VPS后，才能生效系统优化配置，是否现在重启 ? [Y/n] :" yn
+  [ -z "${yn}" ] && yn="y"
+  if [[ $yn == [Yy] ]]; then
+    echo -e "${Info} VPS 重启中..."
+    reboot
+  fi
+}
+
+optimizing_system_johnrosen1() {
+  if [ ! -f "/etc/sysctl.d/99-sysctl.conf" ]; then
+    touch /etc/sysctl.d/99-sysctl.conf
+  fi
+  sed -i '/net.ipv4.tcp_fack/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_early_retrans/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.neigh.default.unres_qlen/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_max_orphans/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.netfilter.nf_conntrack_buckets/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/kernel.pid_max/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/vm.nr_hugepages/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.optmem_max/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.all.route_localnet/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.all.forwarding/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.default.forwarding/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.all.forwarding/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.default.forwarding/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.lo.forwarding/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.lo.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.all.accept_ra/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.default.accept_ra/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.netdev_max_backlog/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.netdev_budget/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.netdev_budget_usecs/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/fs.file-max /d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.rmem_max/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.wmem_max/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.rmem_default/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.wmem_default/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.somaxconn/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.icmp_echo_ignore_all/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.icmp_echo_ignore_broadcasts/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.icmp_ignore_bogus_error_responses/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.all.accept_redirects/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.default.accept_redirects/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.all.secure_redirects/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.default.secure_redirects/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.all.send_redirects/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.default.send_redirects/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.default.rp_filter/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.all.rp_filter/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_keepalive_time/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_keepalive_intvl/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_keepalive_probes/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_synack_retries/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_syncookies/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_rfc1337/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_timestamps/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_tw_reuse/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_fin_timeout/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.ip_local_port_range/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_max_tw_buckets/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_fastopen/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_rmem/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_wmem/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.udp_rmem_min/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.udp_wmem_min/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_mtu_probing/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.all.arp_ignore /d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.default.arp_ignore/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.all.arp_announce/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.conf.default.arp_announce/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_autocorking/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_slow_start_after_idle/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_max_syn_backlog/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.core.default_qdisc/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_notsent_lowat/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_no_metrics_save/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_ecn/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_ecn_fallback/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_frto/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.all.accept_redirects/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.conf.default.accept_redirects/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/vm.swappiness/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.ip_unprivileged_port_start/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/vm.overcommit_memory/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.neigh.default.gc_thresh3/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.neigh.default.gc_thresh2/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.neigh.default.gc_thresh1/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.neigh.default.gc_thresh3/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.neigh.default.gc_thresh2/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv6.neigh.default.gc_thresh1/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.netfilter.nf_conntrack_max/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.nf_conntrack_max/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.netfilter.nf_conntrack_tcp_timeout_fin_wait/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.netfilter.nf_conntrack_tcp_timeout_time_wait/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.netfilter.nf_conntrack_tcp_timeout_close_wait/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.netfilter.nf_conntrack_tcp_timeout_established/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/fs.inotify.max_user_instances/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/fs.inotify.max_user_watches/d' /etc/sysctl.d/99-sysctl.conf
+  sed -i '/net.ipv4.tcp_low_latency/d' /etc/sysctl.d/99-sysctl.conf
+
+  cat >'/etc/sysctl.d/99-sysctl.conf' <<EOF
+net.ipv4.tcp_fack = 1
+net.ipv4.tcp_early_retrans = 3
+net.ipv4.neigh.default.unres_qlen=10000  
+net.ipv4.conf.all.route_localnet=1
+net.ipv4.ip_forward = 1
+net.ipv4.conf.all.forwarding = 1
+net.ipv4.conf.default.forwarding = 1
+#net.ipv6.conf.all.forwarding = 1  #awsipv6问题
+net.ipv6.conf.default.forwarding = 1
+net.ipv6.conf.lo.forwarding = 1
+net.ipv6.conf.all.disable_ipv6 = 0
+net.ipv6.conf.default.disable_ipv6 = 0
+net.ipv6.conf.lo.disable_ipv6 = 0
+net.ipv6.conf.all.accept_ra = 2
+net.ipv6.conf.default.accept_ra = 2
+net.core.netdev_max_backlog = 100000
+net.core.netdev_budget = 50000
+net.core.netdev_budget_usecs = 5000
+#fs.file-max = 51200
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.rmem_default = 67108864
+net.core.wmem_default = 67108864
+net.core.optmem_max = 65536
+net.core.somaxconn = 1000000
+net.ipv4.icmp_echo_ignore_all = 0
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.all.secure_redirects = 0
+net.ipv4.conf.default.secure_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.default.rp_filter = 0
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.tcp_keepalive_intvl = 15
+net.ipv4.tcp_keepalive_probes = 2
+net.ipv4.tcp_synack_retries = 1
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_rfc1337 = 0
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_tw_reuse = 0
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_max_tw_buckets = 5000
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.ipv4.udp_rmem_min = 8192
+net.ipv4.udp_wmem_min = 8192
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_autocorking = 0
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_max_syn_backlog = 819200
+net.ipv4.tcp_notsent_lowat = 16384
+net.ipv4.tcp_no_metrics_save = 0
+net.ipv4.tcp_ecn = 1
+net.ipv4.tcp_ecn_fallback = 1
+net.ipv4.tcp_frto = 0
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv6.conf.default.accept_redirects = 0
+net.ipv4.neigh.default.gc_thresh3=8192
+net.ipv4.neigh.default.gc_thresh2=4096
+net.ipv4.neigh.default.gc_thresh1=2048
+net.ipv6.neigh.default.gc_thresh3=8192
+net.ipv6.neigh.default.gc_thresh2=4096
+net.ipv6.neigh.default.gc_thresh1=2048
+net.ipv4.tcp_orphan_retries = 1
+net.ipv4.tcp_retries2 = 5
+vm.swappiness = 1
+vm.overcommit_memory = 1
+kernel.pid_max=64000
+net.netfilter.nf_conntrack_max = 262144
+net.nf_conntrack_max = 262144
+## Enable bbr
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+net.ipv4.tcp_low_latency = 1
+EOF
+  sysctl -p
+  sysctl --system
+  echo always >/sys/kernel/mm/transparent_hugepage/enabled
+
+  cat >'/etc/systemd/system.conf' <<EOF
+[Manager]
+#DefaultTimeoutStartSec=90s
+DefaultTimeoutStopSec=30s
+#DefaultRestartSec=100ms
+DefaultLimitCORE=infinity
+DefaultLimitNOFILE=infinity
+DefaultLimitNPROC=infinity
+DefaultTasksMax=infinity
+EOF
+
+  cat >'/etc/security/limits.conf' <<EOF
+root     soft   nofile    1000000
+root     hard   nofile    1000000
+root     soft   nproc     unlimited
+root     hard   nproc     unlimited
+root     soft   core      unlimited
+root     hard   core      unlimited
+root     hard   memlock   unlimited
+root     soft   memlock   unlimited
+*     soft   nofile    1000000
+*     hard   nofile    1000000
+*     soft   nproc     unlimited
+*     hard   nproc     unlimited
+*     soft   core      unlimited
+*     hard   core      unlimited
+*     hard   memlock   unlimited
+*     soft   memlock   unlimited
+EOF
+
+  sed -i '/ulimit -SHn/d' /etc/profile
+  sed -i '/ulimit -SHu/d' /etc/profile
+  echo "ulimit -SHn 1000000" >>/etc/profile
+
+  if grep -q "pam_limits.so" /etc/pam.d/common-session; then
+    :
+  else
+    sed -i '/required pam_limits.so/d' /etc/pam.d/common-session
+    echo "session required pam_limits.so" >>/etc/pam.d/common-session
+  fi
+  systemctl daemon-reload
+  echo -e "${Info}优化方案2应用结束，可能需要重启！"
+}
+
+# 函数：生成并写入 Linux 内核网络优化配置
+# 参数（可选，按顺序）：
+#   $1: 延迟 (ms，默认 100)
+#   $2: 本地带宽 (Mbps，默认 1000)
+#   $3: VPS 带宽 (Mbps，默认 1000)
+#   $4: VPS 内存 (MB，默认自动获取)
+optimizing_system_radicalizate() {
+  # 设置默认值
+  local latency_default=100
+  local local_bw_default=1000
+  local vps_bw_default=1000
+  local vps_mem_default=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+
+  # 提示用户输入参数
+  echo -e "请输入参数（用空格隔开）：延迟(ms) 本地带宽(Mbps) VPS带宽(Mbps) VPS内存(MB)"
+  echo -e "可以输入单个或多个参数，未提供的参数将使用默认值"
+  echo -e "示例1（完整参数）：180 500 500 1024"
+  echo -e "示例2（单个参数）：200  # 结果：延迟=200ms, 本地带宽=1000Mbps, VPS带宽=1000Mbps, 内存=自动获取"
+  echo -e "默认参数：延迟=$latency_default ms, 本地带宽=$local_bw_default Mbps, VPS带宽=$vps_bw_default Mbps, 内存=自动获取($vps_mem_default MB)"
+  echo -e "将在 12 秒后使用默认参数，请输入参数并按回车提交（留空使用默认值）："
+
+  # 设置 12 秒倒计时，静默等待输入
+  local input
+  if ! read -t 12 -r input; then
+    echo -e "\n未输入参数或超时，使用默认参数..."
+    local latency=$latency_default
+    local local_bw=$local_bw_default
+    local vps_bw=$vps_bw_default
+    local vps_mem=$vps_mem_default
+  else
+    # 分割用户输入
+    read -r latency local_bw vps_bw vps_mem <<<"$input"
+    # 使用默认值补齐未提供的参数
+    latency=${latency:-$latency_default}
+    local_bw=${local_bw:-$local_bw_default}
+    vps_bw=${vps_bw:-$vps_bw_default}
+    vps_mem=${vps_mem:-$vps_mem_default}
+  fi
+
+  # 显示最终提交的参数信息
+  echo -e "最终提交参数：延迟=$latency ms, 本地带宽=$local_bw Mbps, VPS带宽=$vps_bw Mbps, 内存=$vps_mem MB"
+  sleep 1 # 延迟 1 秒
+
+  # 检查输入参数是否有效
+  if ! [[ "$latency" =~ ^[0-9]+$ ]] || ! [[ "$local_bw" =~ ^[0-9]+$ ]] ||
+    ! [[ "$vps_bw" =~ ^[0-9]+$ ]] || ! [[ "$vps_mem" =~ ^[0-9]+$ ]]; then
+    echo -e "Error: All parameters must be positive integers."
+    return 1
+  fi
+
+  # 检查是否有 root 权限
+  if [ "$EUID" -ne 0 ]; then
+    echo -e "Error: This script requires root privileges to write to /etc/sysctl.d/99-sysctl.conf."
+    return 1
+  fi
+
+  # 计算带宽延迟积 (BDP, 字节)：min(local_bw, vps_bw) * latency / 8
+  local min_bw=$((local_bw < vps_bw ? local_bw : vps_bw))
+  local bdp=$((min_bw * 1000000 * latency / 8 / 1000))
+
+  # 根据内存和 BDP 设置缓冲区大小 (上限不超过内存的 50%)，使用整数运算
+  local rmem_max=$((bdp * 2))     # 2 倍 BDP
+  local wmem_max=$((bdp * 3 / 2)) # 1.5 倍 BDP
+  local max_mem_bytes=$((vps_mem * 1024 * 1024 * 50 / 100))
+  [[ $rmem_max -gt $max_mem_bytes ]] && rmem_max=$max_mem_bytes
+  [[ $wmem_max -gt $max_mem_bytes ]] && wmem_max=$max_mem_bytes
+  [[ $rmem_max -lt 1048576 ]] && rmem_max=1048576 # 最小 1MB
+  [[ $wmem_max -lt 1048576 ]] && wmem_max=1048576 # 最小 1MB
+
+  # 根据带宽和内存设置队列长度
+  local netdev_max_backlog=$((min_bw * 10))
+  [[ $netdev_max_backlog -gt 10000 ]] && netdev_max_backlog=10000
+  [[ $netdev_max_backlog -lt 1000 ]] && netdev_max_backlog=1000
+  local somaxconn=$((vps_mem * 20))
+  [[ $somaxconn -gt 16384 ]] && somaxconn=16384
+  [[ $somaxconn -lt 512 ]] && somaxconn=512
+  local tcp_max_syn_backlog=$((somaxconn * 4))
+  [[ $tcp_max_syn_backlog -gt 65536 ]] && tcp_max_syn_backlog=65536
+
+  # 根据延迟设置初始拥塞窗口
+  local tcp_init_cwnd=$((latency / 20 + 10))
+  [[ $tcp_init_cwnd -gt 32 ]] && tcp_init_cwnd=32
+  [[ $tcp_init_cwnd -lt 10 ]] && tcp_init_cwnd=10
+
+  # 根据内存设置最小空闲内存 (约 10-15% 内存)
+  local min_free_kbytes=$((vps_mem * 1024 * 12 / 100))
+  [[ $min_free_kbytes -gt 524288 ]] && min_free_kbytes=524288 # 最大 512MB
+  [[ $min_free_kbytes -lt 65536 ]] && min_free_kbytes=65536   # 最小 64MB
+
+  # 目标配置文件
+  local config_file="/etc/sysctl.d/99-sysctl.conf"
+  local temp_file=$(mktemp)
+
+  # 定义所有参数和值（包含测试中发现的额外参数）
+  declare -A sysctl_params=(
+    ["kernel.pid_max"]="65535"
+    ["kernel.panic"]="1"
+    ["kernel.sysrq"]="1"
+    ["kernel.core_pattern"]="core_%e"
+    ["kernel.printk"]="3 4 1 3"
+    ["kernel.numa_balancing"]="0"
+    ["kernel.sched_autogroup_enabled"]="0"
+    ["vm.swappiness"]="5"
+    ["vm.dirty_ratio"]="5"
+    ["vm.dirty_background_ratio"]="2"
+    ["vm.panic_on_oom"]="1"
+    ["vm.overcommit_memory"]="1"
+    ["vm.min_free_kbytes"]="$min_free_kbytes"
+    ["net.core.netdev_max_backlog"]="$netdev_max_backlog"
+    ["net.core.rmem_max"]="$rmem_max"
+    ["net.core.wmem_max"]="$wmem_max"
+    ["net.core.rmem_default"]="262144"
+    ["net.core.wmem_default"]="262144"
+    ["net.core.somaxconn"]="$somaxconn"
+    ["net.core.optmem_max"]="262144"
+    ["net.netfilter.nf_conntrack_max"]="262144"
+    ["net.nf_conntrack_max"]="262144"
+    ["net.ipv4.tcp_fastopen"]="3"
+    ["net.ipv4.tcp_timestamps"]="1"
+    ["net.ipv4.tcp_tw_reuse"]="1"
+    ["net.ipv4.tcp_fin_timeout"]="10"
+    ["net.ipv4.tcp_slow_start_after_idle"]="0"
+    ["net.ipv4.tcp_max_tw_buckets"]="32768"
+    ["net.ipv4.tcp_sack"]="1"
+    ["net.ipv4.tcp_fack"]="1"
+    ["net.ipv4.tcp_rmem"]="32768 262144 $rmem_max"
+    ["net.ipv4.tcp_wmem"]="32768 262144 $wmem_max"
+    ["net.ipv4.tcp_mtu_probing"]="1"
+    ["net.ipv4.tcp_notsent_lowat"]="16384"
+    ["net.ipv4.tcp_window_scaling"]="1"
+    ["net.ipv4.tcp_adv_win_scale"]="2"
+    ["net.ipv4.tcp_moderate_rcvbuf"]="1"
+    ["net.ipv4.tcp_no_metrics_save"]="1"
+    ["net.ipv4.tcp_init_cwnd"]="$tcp_init_cwnd"
+    ["net.ipv4.tcp_max_syn_backlog"]="$tcp_max_syn_backlog"
+    ["net.ipv4.tcp_max_orphans"]="32768"
+    ["net.ipv4.tcp_synack_retries"]="2"
+    ["net.ipv4.tcp_syn_retries"]="2"
+    ["net.ipv4.tcp_abort_on_overflow"]="0"
+    ["net.ipv4.tcp_stdurg"]="0"
+    ["net.ipv4.tcp_rfc1337"]="0"
+    ["net.ipv4.tcp_syncookies"]="1"
+    ["net.ipv4.tcp_low_latency"]="1"
+    ["net.ipv4.ip_local_port_range"]="1024 65535"
+    ["net.ipv4.ip_no_pmtu_disc"]="0"
+    ["net.ipv4.route.gc_timeout"]="100"
+    ["net.ipv4.neigh.default.gc_stale_time"]="120"
+    ["net.ipv4.neigh.default.gc_thresh3"]="4096"
+    ["net.ipv4.neigh.default.gc_thresh2"]="2048"
+    ["net.ipv4.neigh.default.gc_thresh1"]="512"
+    ["net.ipv4.icmp_echo_ignore_broadcasts"]="1"
+    ["net.ipv4.icmp_ignore_bogus_error_responses"]="1"
+    ["net.ipv4.conf.all.rp_filter"]="1"
+    ["net.ipv4.conf.default.rp_filter"]="1"
+    ["net.ipv4.conf.all.arp_announce"]="2"
+    ["net.ipv4.conf.default.arp_announce"]="2"
+    ["net.ipv4.conf.all.arp_ignore"]="1"
+    ["net.ipv4.conf.default.arp_ignore"]="1"
+  )
+
+  # 添加文件头部注释
+  echo "# Generated sysctl configuration" >"$temp_file"
+  echo "# Latency: $latency ms" >>"$temp_file"
+  echo "# Local Bandwidth: $local_bw Mbps" >>"$temp_file"
+  echo "# VPS Bandwidth: $vps_bw Mbps" >>"$temp_file"
+  echo "# VPS Memory: $vps_mem MB" >>"$temp_file"
+  echo "" >>"$temp_file"
+
+  # 如果配置文件不存在，直接写入所有参数
+  if [ ! -f "$config_file" ]; then
+    for key in "${!sysctl_params[@]}"; do
+      echo "$key=${sysctl_params[$key]}" >>"$temp_file"
+    done
+  else
+    # 读取现有配置文件内容，去除多余空格
+    cp "$config_file" "$temp_file.bak"
+    while IFS='=' read -r key value; do
+      key=$(echo "$key" | xargs)     # 去除首尾空格
+      value=$(echo "$value" | xargs) # 去除值中的多余空格
+      if [ -n "$key" ] && [[ ! "$key" =~ ^# ]]; then
+        if [[ -n "${sysctl_params[$key]}" ]]; then
+          echo "$key=${sysctl_params[$key]}" >>"$temp_file.new"
+          unset sysctl_params["$key"]
+        else
+          echo "$key=$value" >>"$temp_file.new"
+        fi
+      fi
+    done <"$config_file"
+
+    # 将新参数追加到临时文件
+    for key in "${!sysctl_params[@]}"; do
+      echo "$key=${sysctl_params[$key]}" >>"$temp_file.new"
+    done
+
+    # 合并并替换临时文件
+    cat "$temp_file" >"$temp_file.final"
+    cat "$temp_file.new" >>"$temp_file.final"
+    mv "$temp_file.final" "$temp_file"
+    rm -f "$temp_file.new" "$temp_file.bak"
+  fi
+
+  # 写入目标文件并应用配置
+  mv "$temp_file" "$config_file"
+  chmod 644 "$config_file"
+  sysctl -p "$config_file" >/dev/null 2>&1
+  sysctl --system >/dev/null 2>&1
+  echo -e "${Info}激进方案应用完毕，有些设置可能需要重启生效！"
+}
+
+#处理传进来的参数 直接优化
+err() {
+  echo "错误: $1"
+  exit 1
+}
+
+while [ $# -gt 0 ]; do
+  case $1 in
+  op)
+    optimizing_system_old # 调用函数
+    exit
+    ;;
+  op2)
+    optimizing_system_johnrosen1 # 调用函数
+    exit
+    ;;
+  op3)
+    optimizing_system_radicalizate # 调用函数
+    exit
+    ;;
+  *)
+    err "未知选项: \"$1\""
+    ;;
+  esac
+  shift # 移动到下一个参数
+done
+
 # 检查github网络
 check_github() {
   # 检测域名的可访问性函数
@@ -60,7 +578,7 @@ check_github() {
     sleep 1
   else
     # 所有域名均可访问，打印成功提示
-    echo "${Green_font_prefix}github可访问${Font_color_suffix}，继续执行脚本..."
+    echo -e "${Green_font_prefix}github可访问${Font_color_suffix}，继续执行脚本..."
   fi
 }
 
@@ -1027,288 +1545,6 @@ remove_all() {
   sleep 1s
 }
 
-#优化系统配置
-optimizing_system() {
-  if [ ! -f "/etc/sysctl.conf" ]; then
-    touch /etc/sysctl.conf
-  fi
-  sed -i '/net.ipv4.tcp_retries2/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_slow_start_after_idle/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_fastopen/d' /etc/sysctl.conf
-  sed -i '/fs.file-max/d' /etc/sysctl.conf
-  sed -i '/fs.inotify.max_user_instances/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_syncookies/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_fin_timeout/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_tw_reuse/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_max_syn_backlog/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.ip_local_port_range/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_max_tw_buckets/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.route.gc_timeout/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_synack_retries/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_syn_retries/d' /etc/sysctl.conf
-  sed -i '/net.core.somaxconn/d' /etc/sysctl.conf
-  sed -i '/net.core.netdev_max_backlog/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_timestamps/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.tcp_max_orphans/d' /etc/sysctl.conf
-  sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf
-
-  echo "net.ipv4.tcp_retries2 = 8
-net.ipv4.tcp_slow_start_after_idle = 0
-fs.file-max = 1000000
-fs.inotify.max_user_instances = 8192
-net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_fin_timeout = 30
-net.ipv4.tcp_tw_reuse = 1
-net.ipv4.ip_local_port_range = 1024 65000
-net.ipv4.tcp_max_syn_backlog = 16384
-net.ipv4.tcp_max_tw_buckets = 6000
-net.ipv4.route.gc_timeout = 100
-net.ipv4.tcp_syn_retries = 1
-net.ipv4.tcp_synack_retries = 1
-net.core.somaxconn = 32768
-net.core.netdev_max_backlog = 32768
-net.ipv4.tcp_timestamps = 0
-net.ipv4.tcp_max_orphans = 32768
-# forward ipv4
-#net.ipv4.ip_forward = 1" >>/etc/sysctl.conf
-  sysctl -p
-  echo "*               soft    nofile           1000000
-*               hard    nofile          1000000" >/etc/security/limits.conf
-  echo "ulimit -SHn 1000000" >>/etc/profile
-  read -p "需要重启VPS后，才能生效系统优化配置，是否现在重启 ? [Y/n] :" yn
-  [ -z "${yn}" ] && yn="y"
-  if [[ $yn == [Yy] ]]; then
-    echo -e "${Info} VPS 重启中..."
-    reboot
-  fi
-}
-
-optimizing_system_johnrosen1() {
-  if [ ! -f "/etc/sysctl.d/99-sysctl.conf" ]; then
-    touch /etc/sysctl.d/99-sysctl.conf
-  fi
-  sed -i '/net.ipv4.tcp_fack/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_early_retrans/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.neigh.default.unres_qlen/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_max_orphans/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.netfilter.nf_conntrack_buckets/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/kernel.pid_max/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/vm.nr_hugepages/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.optmem_max/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.all.route_localnet/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.all.forwarding/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.default.forwarding/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.all.forwarding/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.default.forwarding/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.lo.forwarding/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.lo.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.all.accept_ra/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.default.accept_ra/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.netdev_max_backlog/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.netdev_budget/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.netdev_budget_usecs/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/fs.file-max /d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.rmem_max/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.wmem_max/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.rmem_default/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.wmem_default/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.somaxconn/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.icmp_echo_ignore_all/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.icmp_echo_ignore_broadcasts/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.icmp_ignore_bogus_error_responses/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.all.accept_redirects/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.default.accept_redirects/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.all.secure_redirects/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.default.secure_redirects/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.all.send_redirects/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.default.send_redirects/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.default.rp_filter/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.all.rp_filter/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_keepalive_time/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_keepalive_intvl/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_keepalive_probes/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_synack_retries/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_syncookies/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_rfc1337/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_timestamps/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_tw_reuse/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_fin_timeout/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.ip_local_port_range/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_max_tw_buckets/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_fastopen/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_rmem/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_wmem/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.udp_rmem_min/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.udp_wmem_min/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_mtu_probing/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.all.arp_ignore /d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.default.arp_ignore/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.all.arp_announce/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.conf.default.arp_announce/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_autocorking/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_slow_start_after_idle/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_max_syn_backlog/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.core.default_qdisc/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_notsent_lowat/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_no_metrics_save/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_ecn/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_ecn_fallback/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_frto/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.all.accept_redirects/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.conf.default.accept_redirects/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/vm.swappiness/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.ip_unprivileged_port_start/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/vm.overcommit_memory/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.neigh.default.gc_thresh3/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.neigh.default.gc_thresh2/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.neigh.default.gc_thresh1/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.neigh.default.gc_thresh3/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.neigh.default.gc_thresh2/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv6.neigh.default.gc_thresh1/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.netfilter.nf_conntrack_max/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.nf_conntrack_max/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.netfilter.nf_conntrack_tcp_timeout_fin_wait/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.netfilter.nf_conntrack_tcp_timeout_time_wait/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.netfilter.nf_conntrack_tcp_timeout_close_wait/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.netfilter.nf_conntrack_tcp_timeout_established/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/fs.inotify.max_user_instances/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/fs.inotify.max_user_watches/d' /etc/sysctl.d/99-sysctl.conf
-  sed -i '/net.ipv4.tcp_low_latency/d' /etc/sysctl.d/99-sysctl.conf
-
-  cat >'/etc/sysctl.d/99-sysctl.conf' <<EOF
-net.ipv4.tcp_fack = 1
-net.ipv4.tcp_early_retrans = 3
-net.ipv4.neigh.default.unres_qlen=10000  
-net.ipv4.conf.all.route_localnet=1
-net.ipv4.ip_forward = 1
-net.ipv4.conf.all.forwarding = 1
-net.ipv4.conf.default.forwarding = 1
-#net.ipv6.conf.all.forwarding = 1  #awsipv6问题
-net.ipv6.conf.default.forwarding = 1
-net.ipv6.conf.lo.forwarding = 1
-net.ipv6.conf.all.disable_ipv6 = 0
-net.ipv6.conf.default.disable_ipv6 = 0
-net.ipv6.conf.lo.disable_ipv6 = 0
-net.ipv6.conf.all.accept_ra = 2
-net.ipv6.conf.default.accept_ra = 2
-net.core.netdev_max_backlog = 100000
-net.core.netdev_budget = 50000
-net.core.netdev_budget_usecs = 5000
-#fs.file-max = 51200
-net.core.rmem_max = 67108864
-net.core.wmem_max = 67108864
-net.core.rmem_default = 67108864
-net.core.wmem_default = 67108864
-net.core.optmem_max = 65536
-net.core.somaxconn = 1000000
-net.ipv4.icmp_echo_ignore_all = 0
-net.ipv4.icmp_echo_ignore_broadcasts = 1
-net.ipv4.icmp_ignore_bogus_error_responses = 1
-net.ipv4.conf.all.accept_redirects = 0
-net.ipv4.conf.default.accept_redirects = 0
-net.ipv4.conf.all.secure_redirects = 0
-net.ipv4.conf.default.secure_redirects = 0
-net.ipv4.conf.all.send_redirects = 0
-net.ipv4.conf.default.send_redirects = 0
-net.ipv4.conf.default.rp_filter = 0
-net.ipv4.conf.all.rp_filter = 0
-net.ipv4.tcp_keepalive_time = 600
-net.ipv4.tcp_keepalive_intvl = 15
-net.ipv4.tcp_keepalive_probes = 2
-net.ipv4.tcp_synack_retries = 1
-net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_rfc1337 = 0
-net.ipv4.tcp_timestamps = 1
-net.ipv4.tcp_tw_reuse = 0
-net.ipv4.tcp_fin_timeout = 15
-net.ipv4.ip_local_port_range = 1024 65535
-net.ipv4.tcp_max_tw_buckets = 5000
-#net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_rmem = 4096 87380 67108864
-net.ipv4.tcp_wmem = 4096 65536 67108864
-net.ipv4.udp_rmem_min = 8192
-net.ipv4.udp_wmem_min = 8192
-net.ipv4.tcp_mtu_probing = 1
-net.ipv4.tcp_autocorking = 0
-net.ipv4.tcp_slow_start_after_idle = 0
-net.ipv4.tcp_max_syn_backlog = 819200
-net.ipv4.tcp_notsent_lowat = 16384
-net.ipv4.tcp_no_metrics_save = 0
-net.ipv4.tcp_ecn = 1
-net.ipv4.tcp_ecn_fallback = 1
-net.ipv4.tcp_frto = 0
-net.ipv6.conf.all.accept_redirects = 0
-net.ipv6.conf.default.accept_redirects = 0
-net.ipv4.neigh.default.gc_thresh3=8192
-net.ipv4.neigh.default.gc_thresh2=4096
-net.ipv4.neigh.default.gc_thresh1=2048
-net.ipv6.neigh.default.gc_thresh3=8192
-net.ipv6.neigh.default.gc_thresh2=4096
-net.ipv6.neigh.default.gc_thresh1=2048
-net.ipv4.tcp_orphan_retries = 1
-net.ipv4.tcp_retries2 = 5
-vm.swappiness = 1
-vm.overcommit_memory = 1
-kernel.pid_max=64000
-net.netfilter.nf_conntrack_max = 262144
-net.nf_conntrack_max = 262144
-## Enable bbr
-net.core.default_qdisc = fq
-net.ipv4.tcp_congestion_control = bbr
-net.ipv4.tcp_low_latency = 1
-EOF
-  sysctl -p
-  sysctl --system
-  echo always >/sys/kernel/mm/transparent_hugepage/enabled
-
-  cat >'/etc/systemd/system.conf' <<EOF
-[Manager]
-#DefaultTimeoutStartSec=90s
-DefaultTimeoutStopSec=30s
-#DefaultRestartSec=100ms
-DefaultLimitCORE=infinity
-DefaultLimitNOFILE=infinity
-DefaultLimitNPROC=infinity
-DefaultTasksMax=infinity
-EOF
-
-  cat >'/etc/security/limits.conf' <<EOF
-root     soft   nofile    1000000
-root     hard   nofile    1000000
-root     soft   nproc     unlimited
-root     hard   nproc     unlimited
-root     soft   core      unlimited
-root     hard   core      unlimited
-root     hard   memlock   unlimited
-root     soft   memlock   unlimited
-*     soft   nofile    1000000
-*     hard   nofile    1000000
-*     soft   nproc     unlimited
-*     hard   nproc     unlimited
-*     soft   core      unlimited
-*     hard   core      unlimited
-*     hard   memlock   unlimited
-*     soft   memlock   unlimited
-EOF
-
-  sed -i '/ulimit -SHn/d' /etc/profile
-  sed -i '/ulimit -SHu/d' /etc/profile
-  echo "ulimit -SHn 1000000" >>/etc/profile
-
-  if grep -q "pam_limits.so" /etc/pam.d/common-session; then
-    :
-  else
-    sed -i '/required pam_limits.so/d' /etc/pam.d/common-session
-    echo "session required pam_limits.so" >>/etc/pam.d/common-session
-  fi
-  systemctl daemon-reload
-  echo -e "${Info}优化方案2应用结束，可能需要重启！"
-}
-
 optimizing_ddcc() {
   sed -i '/net.ipv4.conf.all.rp_filter/d' /etc/sysctl.d/99-sysctl.conf
   sed -i '/net.ipv4.tcp_syncookies/d' /etc/sysctl.d/99-sysctl.conf
@@ -1435,7 +1671,8 @@ start_menu() {
  ${Green_font_prefix}17.${Font_color_suffix} 开启ECN	 		${Green_font_prefix}18.${Font_color_suffix} 关闭ECN
  ${Green_font_prefix}19.${Font_color_suffix} 使用BBRplus+FQ版加速 
  ${Green_font_prefix}20.${Font_color_suffix} 使用Lotserver(锐速)加速 
- ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化	 	${Green_font_prefix}22.${Font_color_suffix} 应用优化方案2
+ ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧 ${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
+ ${Green_font_prefix}27.${Font_color_suffix} 系统配置优化激进方案
  ${Green_font_prefix}23.${Font_color_suffix} 禁用IPv6	 		${Green_font_prefix}24.${Font_color_suffix} 开启IPv6
  ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速	 	${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
 ————————————————————————————————————————————————————————————————" &&
@@ -1526,6 +1763,9 @@ start_menu() {
     ;;
   26)
     optimizing_ddcc
+    ;;
+  27)
+    optimizing_system_radicalizate
     ;;
   99)
     exit 1
