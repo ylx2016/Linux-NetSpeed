@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.2
+#	Version: 100.0.4.3
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.2"
+sh_ver="100.0.4.3"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -1302,7 +1302,7 @@ installcloud() {
 
   # 清理下载的文件
   rm -f "$IMAGE_DEB_FILE" "$VERSION_MAP_FILE"
-  
+
   BBR_grub
   echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
   check_kernel
@@ -1644,14 +1644,14 @@ start_menu() {
 ————————————————————————————————————————————————————————————————" &&
     check_status
   get_system_info
-  echo -e " 系统信息: ${Font_color_suffix}$opsy ${Green_font_prefix}$virtual${Font_color_suffix} $arch ${Green_font_prefix}$kern${Font_color_suffix} "
+  echo -e " 信息： ${Font_color_suffix}$opsy ${Green_font_prefix}$virtual${Font_color_suffix} $arch ${Green_font_prefix}$kern${Font_color_suffix} "
   if [[ ${kernel_status} == "noinstall" ]]; then
-    echo -e " 当前状态: ${Green_font_prefix}未安装${Font_color_suffix} 加速内核 ${Red_font_prefix}请先安装内核${Font_color_suffix}"
+    echo -e " 状态: ${Green_font_prefix}未安装${Font_color_suffix} 加速内核 ${Red_font_prefix}请先安装内核${Font_color_suffix}"
   else
-    echo -e " 当前状态: ${Green_font_prefix}已安装${Font_color_suffix} ${Red_font_prefix}${kernel_status}${Font_color_suffix} 加速内核 , ${Green_font_prefix}${run_status}${Font_color_suffix}"
+    echo -e " 状态: ${Green_font_prefix}已安装${Font_color_suffix} ${Red_font_prefix}${kernel_status}${Font_color_suffix} 加速内核 , ${Green_font_prefix}${run_status}${Font_color_suffix}"
 
   fi
-  echo -e " 当前拥塞控制算法为: ${Green_font_prefix}${net_congestion_control}${Font_color_suffix} 当前队列算法为: ${Green_font_prefix}${net_qdisc}${Font_color_suffix} "
+  echo -e " 拥塞控制算法: ${Green_font_prefix}${net_congestion_control}${Font_color_suffix} 队列算法: ${Green_font_prefix}${net_qdisc}${Font_color_suffix} 内核headers：${Green_font_prefix}${headers_status}${Font_color_suffix}"
 
   read -p " 请输入数字 :" num
   case "$num" in
@@ -2491,78 +2491,83 @@ check_sys_official_zen() {
 
 #检查系统当前状态
 check_status() {
+  # 初始化变量，避免重复读取文件
   kernel_version=$(uname -r | awk -F "-" '{print $1}')
   kernel_version_full=$(uname -r)
-  net_congestion_control=$(cat /proc/sys/net/ipv4/tcp_congestion_control | awk '{print $1}')
-  net_qdisc=$(cat /proc/sys/net/core/default_qdisc | awk '{print $1}')
-  if [[ ${kernel_version_full} == *bbrplus* ]]; then
+  net_congestion_control=$(cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "unknown")
+  net_qdisc=$(cat /proc/sys/net/core/default_qdisc 2>/dev/null || echo "unknown")
+
+  # 检测内核类型
+  if [[ "$kernel_version_full" == *bbrplus* ]]; then
     kernel_status="BBRplus"
-  elif [[ ${kernel_version_full} == *4.9.0-4* || ${kernel_version_full} == *4.15.0-30* || ${kernel_version_full} == *4.8.0-36* || ${kernel_version_full} == *3.16.0-77* || ${kernel_version_full} == *3.16.0-4* || ${kernel_version_full} == *3.2.0-4* || ${kernel_version_full} == *4.11.2-1* || ${kernel_version_full} == *2.6.32-504* || ${kernel_version_full} == *4.4.0-47* || ${kernel_version_full} == *3.13.0-29 || ${kernel_version_full} == *4.4.0-47* ]]; then
+  elif [[ "$kernel_version_full" =~ (4\.9\.0-4|4\.15\.0-30|4\.8\.0-36|3\.16\.0-77|3\.16\.0-4|3\.2\.0-4|4\.11\.2-1|2\.6\.32-504|4\.4\.0-47|3\.13\.0-29) ]]; then
     kernel_status="Lotserver"
-  elif [[ $(echo ${kernel_version} | awk -F'.' '{print $1}') == "4" ]] && [[ $(echo ${kernel_version} | awk -F'.' '{print $2}') -ge 9 ]] || [[ $(echo ${kernel_version} | awk -F'.' '{print $1}') == "5" ]] || [[ $(echo ${kernel_version} | awk -F'.' '{print $1}') == "6" ]]; then
+  elif read major minor <<<$(echo "$kernel_version" | awk -F'.' '{print $1, $2}') &&
+    { [[ "$major" == "4" && "$minor" -ge 9 ]] || [[ "$major" == "5" ]] || [[ "$major" == "6" ]] || [[ "$major" == "7" ]]; }; then
     kernel_status="BBR"
   else
     kernel_status="noinstall"
   fi
 
-  if [[ ${kernel_status} == "BBR" ]]; then
-    run_status=$(cat /proc/sys/net/ipv4/tcp_congestion_control | awk '{print $1}')
-    if [[ ${run_status} == "bbr" ]]; then
-      run_status=$(cat /proc/sys/net/ipv4/tcp_congestion_control | awk '{print $1}')
-      if [[ ${run_status} == "bbr" ]]; then
-        run_status="BBR启动成功"
-      else
-        run_status="BBR启动失败"
-      fi
-    elif [[ ${run_status} == "bbr2" ]]; then
-      run_status=$(cat /proc/sys/net/ipv4/tcp_congestion_control | awk '{print $1}')
-      if [[ ${run_status} == "bbr2" ]]; then
-        run_status="BBR2启动成功"
-      else
-        run_status="BBR2启动失败"
-      fi
-    elif [[ ${run_status} == "tsunami" ]]; then
-      run_status=$(lsmod | grep "tsunami" | awk '{print $1}')
-      if [[ ${run_status} == "tcp_tsunami" ]]; then
+  # 运行状态检测
+  if [[ "$kernel_status" == "BBR" ]]; then
+    case "$net_congestion_control" in
+    "bbr")
+      run_status="BBR启动成功"
+      ;;
+    "bbr2")
+      run_status="BBR2启动成功"
+      ;;
+    "tsunami")
+      if lsmod | grep -q "^tcp_tsunami"; then
         run_status="BBR魔改版启动成功"
       else
         run_status="BBR魔改版启动失败"
       fi
-    elif [[ ${run_status} == "nanqinlang" ]]; then
-      run_status=$(lsmod | grep "nanqinlang" | awk '{print $1}')
-      if [[ ${run_status} == "tcp_nanqinlang" ]]; then
+      ;;
+    "nanqinlang")
+      if lsmod | grep -q "^tcp_nanqinlang"; then
         run_status="暴力BBR魔改版启动成功"
       else
         run_status="暴力BBR魔改版启动失败"
       fi
-    else
+      ;;
+    *)
       run_status="未安装加速模块"
-    fi
-
-  elif [[ ${kernel_status} == "Lotserver" ]]; then
+      ;;
+    esac
+  elif [[ "$kernel_status" == "Lotserver" ]]; then
     if [[ -e /appex/bin/lotServer.sh ]]; then
       run_status=$(bash /appex/bin/lotServer.sh status | grep "LotServer" | awk '{print $3}')
-      if [[ ${run_status} == "running!" ]]; then
-        run_status="启动成功"
-      else
-        run_status="启动失败"
-      fi
+      [[ "$run_status" == "running!" ]] && run_status="启动成功" || run_status="启动失败"
     else
       run_status="未安装加速模块"
     fi
-  elif [[ ${kernel_status} == "BBRplus" ]]; then
-    run_status=$(cat /proc/sys/net/ipv4/tcp_congestion_control | awk '{print $1}')
-    if [[ ${run_status} == "bbrplus" ]]; then
-      run_status=$(cat /proc/sys/net/ipv4/tcp_congestion_control | awk '{print $1}')
-      if [[ ${run_status} == "bbrplus" ]]; then
-        run_status="BBRplus启动成功"
-      else
-        run_status="BBRplus启动失败"
-      fi
-    elif [[ ${run_status} == "bbr" ]]; then
+  elif [[ "$kernel_version" == "BBRplus" ]]; then
+    case "$net_congestion_control" in
+    "bbrplus")
+      run_status="BBRplus启动成功"
+      ;;
+    "bbr")
       run_status="BBR启动成功"
-    else
+      ;;
+    *)
       run_status="未安装加速模块"
+      ;;
+    esac
+  else
+    run_status="未安装加速模块"
+  fi
+
+  # Headers 状态检测（三种状态）
+  local installed_headers=$(dpkg -l | grep "linux-headers" | awk '{print $2}' | grep -v '^$' || echo "")
+  if [[ -z "$installed_headers" ]]; then
+    headers_status="未安装"
+  else
+    if echo "$installed_headers" | grep -q "^linux-headers-${kernel_version_full}$"; then
+      headers_status="已匹配"
+    else
+      headers_status="未匹配"
     fi
   fi
 }
