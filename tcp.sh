@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.1
+#	Version: 100.0.4.2
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.1"
+sh_ver="100.0.4.2"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -1224,20 +1224,16 @@ installcloud() {
   local ARCH=$(uname -m)
   local VERSIONS=()
   local VERSION_MAP_FILE="/tmp/version_map.txt"
-  local HEADERS_MAP_FILE="/tmp/headers_map.txt"
 
-  # 检查架构并设置 IMAGE_URL 和 HEADERS_PATTERN
+  # 检查架构并设置 IMAGE_URL 和 IMAGE_PATTERN
   local IMAGE_URL
   local IMAGE_PATTERN
-  local HEADER_PATTERN
   if [ "$ARCH" == "x86_64" ]; then
     IMAGE_URL="https://deb.debian.org/debian/pool/main/l/linux-signed-amd64/"
     IMAGE_PATTERN='linux-image-[^"]+cloud-amd64_[^"]+_amd64\.deb'
-    HEADER_PATTERN='linux-headers-[^"]+cloud-amd64_[^"]+_amd64\.deb'
   elif [ "$ARCH" == "aarch64" ]; then
     IMAGE_URL="https://deb.debian.org/debian/pool/main/l/linux-signed-arm64/"
     IMAGE_PATTERN='linux-image-[^"]+cloud-arm64_[^"]+_arm64\.deb'
-    HEADER_PATTERN='linux-headers-[^"]+cloud-arm64_[^"]+_arm64\.deb'
   else
     echo "不支持的架构：$ARCH，仅支持 x86_64 和 aarch64"
     exit 1
@@ -1247,12 +1243,9 @@ installcloud() {
 
   # 获取 cloud 内核 .deb 文件列表
   local DEB_FILES_RAW=$(curl -s "$IMAGE_URL" | grep -oP "$IMAGE_PATTERN")
-  # 获取 headers 文件列表，根据架构筛选
-  local HEADER_FILES_RAW=$(curl -s https://deb.debian.org/debian/pool/main/l/linux/ | grep -oP "$HEADER_PATTERN")
 
   # 清空临时映射文件
   >"$VERSION_MAP_FILE"
-  >"$HEADERS_MAP_FILE"
 
   # 提取 image 版本号并写入映射文件
   while IFS= read -r file; do
@@ -1261,14 +1254,6 @@ installcloud() {
       echo "$ver:$file" >>"$VERSION_MAP_FILE"
     fi
   done <<<"$DEB_FILES_RAW"
-
-  # 提取 headers 版本号并写入映射文件
-  while IFS= read -r file; do
-    if [[ "$file" =~ linux-headers-([0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9]+)?) ]]; then
-      local ver="${BASH_REMATCH[1]}"
-      echo "$ver:$file" >>"$HEADERS_MAP_FILE"
-    fi
-  done <<<"$HEADER_FILES_RAW"
 
   # 读取排序并去重后的版本号
   mapfile -t VERSIONS < <(cut -d':' -f1 "$VERSION_MAP_FILE" | sort -V -u)
@@ -1286,9 +1271,21 @@ installcloud() {
 
   # 默认选择最新版本
   local DEFAULT_INDEX=$((${#VERSIONS[@]} - 1))
-  echo "请选择要安装的cloud内核版本（8秒后默认选择最新版本回车加速 ${VERSIONS[$DEFAULT_INDEX]}）："
-  read -t 8 -p "输入选项编号: " CHOICE
-  CHOICE=${CHOICE:-$DEFAULT_INDEX}
+  echo "请选择要安装的cloud内核版本（10秒后默认选择最新版本回车加速 ${VERSIONS[$DEFAULT_INDEX]}，输入'h'则使用apt安装非最新cloud及headers）："
+  read -t 10 -p "输入选项编号或'h': " CHOICE
+
+  # 检查是否使用 apt 安装 cloud 及 headers
+  local USE_APT=false
+  if [[ "$CHOICE" =~ ^[hH]$ ]]; then
+    USE_APT=true
+    if [ "$DISTRO" != "debian" ]; then
+      echo "错误：使用 'h' 安装 headers 仅支持 Debian 系统，当前系统为 $DISTRO"
+      exit 1
+    fi
+    CHOICE=$DEFAULT_INDEX
+  else
+    CHOICE=${CHOICE:-$DEFAULT_INDEX}
+  fi
 
   # 验证输入
   if [[ ! "$CHOICE" =~ ^[0-9]+$ ]] || [ "$CHOICE" -lt 0 ] || [ "$CHOICE" -ge "${#VERSIONS[@]}" ]; then
@@ -1298,37 +1295,29 @@ installcloud() {
 
   local SELECTED_VERSION="${VERSIONS[$CHOICE]}"
   local IMAGE_DEB_FILE=$(grep "^$SELECTED_VERSION:" "$VERSION_MAP_FILE" | tail -n 1 | cut -d':' -f2)
-  local HEADER_DEB_FILE=$(grep "^$SELECTED_VERSION:" "$HEADERS_MAP_FILE" | tail -n 1 | cut -d':' -f2)
 
   kernel_version=$SELECTED_VERSION
 
-  # 检查是否找到匹配的 headers 文件
-  # if [ -z "$HEADER_DEB_FILE" ]; then
-  #   echo "警告：未找到版本 $SELECTED_VERSION 的 headers 文件（架构 $ARCH），将只安装内核镜像"
-  # fi
-
-  # headers URL 不区分架构
-  local HEADER_URL="https://deb.debian.org/debian/pool/main/l/linux/"
-
-  # 下载并安装 headers（如果存在）
-  # if [ -n "$HEADER_DEB_FILE" ]; then
-  #   echo "正在下载 $HEADER_URL$HEADER_DEB_FILE ..."
-  #   curl -O "$HEADER_URL$HEADER_DEB_FILE"
-  #   echo "正在安装 $HEADER_DEB_FILE ..."
-  #   sudo dpkg -i "$HEADER_DEB_FILE"
-  #   sudo apt-get install -f -y # 解决可能的依赖问题
-  # fi
-  echo "不安装下载安装headers节省体积，需要headers的请选择其他内核或者我听大家意见，headers依赖有几个组件！"
-
-  # 下载并安装 image
-  echo "正在下载 $IMAGE_URL$IMAGE_DEB_FILE ..."
-  curl -O "$IMAGE_URL$IMAGE_DEB_FILE"
-  echo "正在安装 $IMAGE_DEB_FILE ..."
-  sudo dpkg -i "$IMAGE_DEB_FILE"
-  sudo apt-get install -f -y # 解决可能的依赖问题
+  # 如果选择 'h'，使用 apt 安装 cloud 内核及 headers
+  if [ "$USE_APT" = true ]; then
+    echo "正在使用 apt 安装 linux-image-cloud-${ARCH} 及 headers..."
+    sudo apt update
+    if [ "$ARCH" == "x86_64" ]; then
+      sudo apt install -y "linux-image-cloud-amd64" "linux-headers-cloud-amd64"
+    elif [ "$ARCH" == "aarch64" ]; then
+      sudo apt install -y "linux-image-cloud-arm64" "linux-headers-cloud-arm64"
+    fi
+  else
+    # 下载并安装 image
+    echo "正在下载 $IMAGE_URL$IMAGE_DEB_FILE ..."
+    curl -O "$IMAGE_URL$IMAGE_DEB_FILE"
+    echo "正在安装 $IMAGE_DEB_FILE ..."
+    sudo dpkg -i "$IMAGE_DEB_FILE"
+    sudo apt-get install -f -y # 解决可能的依赖问题
+  fi
 
   # 清理下载的文件
-  rm -f "$IMAGE_DEB_FILE" "$HEADER_DEB_FILE" "$VERSION_MAP_FILE" "$HEADERS_MAP_FILE"
+  rm -f "$IMAGE_DEB_FILE" "$VERSION_MAP_FILE"
 
   detele_kernel
   BBR_grub
