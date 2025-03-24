@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.3
+#	Version: 100.0.4.5
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.3"
+sh_ver="100.0.4.5"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -1412,6 +1412,26 @@ closeecn() {
   echo -e "${Info}关闭ecn结束！"
 }
 
+#编译安装brutal
+startbrutal() {
+  # 如果 headers_status 为 "已匹配headers"，执行外部脚本
+  if [[ "$headers_status" == "已匹配" ]]; then
+    echo "Headers 已匹配，开始编译..."
+    bash <(curl -fsSL https://tcp.hy2.sh/)
+    # 检查 brutal 模块是否加载
+    if lsmod | grep -q "brutal"; then
+      echo "brutal 模块已加载，请重新运行脚本查看状态"
+      exit 0 # 成功退出
+    else
+      echo "brutal 模块未加载，可能编译安装失败"
+      exit 1 # 失败退出
+    fi
+  else
+    echo "当前内核headers不匹配或者没有安装"
+    exit 1
+  fi
+}
+
 #卸载bbr+锐速
 remove_bbr_lotserver() {
   sed -i '/net.ipv4.tcp_ecn/d' /etc/sysctl.d/99-sysctl.conf
@@ -1637,7 +1657,7 @@ start_menu() {
  ${Green_font_prefix}17.${Font_color_suffix} 开启ECN	 		${Green_font_prefix}18.${Font_color_suffix} 关闭ECN
  ${Green_font_prefix}19.${Font_color_suffix} 使用BBRplus+FQ版加速       ${Green_font_prefix}20.${Font_color_suffix} 使用Lotserver(锐速)加速
  ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧		${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
- ${Green_font_prefix}27.${Font_color_suffix} 系统配置优化激进方案
+ ${Green_font_prefix}27.${Font_color_suffix} 系统配置优化激进方案	${Green_font_prefix}28.${Font_color_suffix} 编译安装brutal模块
  ${Green_font_prefix}23.${Font_color_suffix} 禁用IPv6	 		${Green_font_prefix}24.${Font_color_suffix} 开启IPv6
  ${Green_font_prefix}51.${Font_color_suffix} 查看排序内核               ${Green_font_prefix}52.${Font_color_suffix} 删除保留指定内核
  ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速	 	${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
@@ -1648,7 +1668,7 @@ start_menu() {
   if [[ ${kernel_status} == "noinstall" ]]; then
     echo -e " 状态: ${Green_font_prefix}未安装${Font_color_suffix} 加速内核 ${Red_font_prefix}请先安装内核${Font_color_suffix}"
   else
-    echo -e " 状态: ${Green_font_prefix}已安装${Font_color_suffix} ${Red_font_prefix}${kernel_status}${Font_color_suffix} 加速内核 , ${Green_font_prefix}${run_status}${Font_color_suffix}"
+    echo -e " 状态: ${Green_font_prefix}已安装${Font_color_suffix} ${Red_font_prefix}${kernel_status}${Font_color_suffix} 加速内核 , ${Green_font_prefix}${run_status}${Font_color_suffix} ${Red_font_prefix}${brutal}${Font_color_suffix}"
 
   fi
   echo -e " 拥塞控制算法: ${Green_font_prefix}${net_congestion_control}${Font_color_suffix} 队列算法: ${Green_font_prefix}${net_qdisc}${Font_color_suffix} 内核headers：${Green_font_prefix}${headers_status}${Font_color_suffix}"
@@ -1750,6 +1770,9 @@ start_menu() {
     ;;
   27)
     optimizing_system_radicalizate
+    ;;
+  28)
+    startbrutal
     ;;
   51)
     BBR_grub
@@ -2569,6 +2592,12 @@ check_status() {
     else
       headers_status="未匹配"
     fi
+  fi
+
+  # Brutal 状态检测
+  brutal=""
+  if lsmod | grep -q "brutal"; then
+    brutal="brutal已加载"
   fi
 }
 
