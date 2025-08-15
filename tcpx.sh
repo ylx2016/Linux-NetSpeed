@@ -4,7 +4,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.5
+#	Version: 100.0.4.6
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -15,7 +15,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.5"
+sh_ver="100.0.4.6"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -1780,6 +1780,9 @@ start_menu() {
   52)
     detele_kernel_custom
     ;;
+  61)
+    update_sysctl_interactive
+    ;;
   99)
     exit 1
     ;;
@@ -1866,6 +1869,163 @@ detele_kernel_custom() {
   detele_kernel
   detele_kernel_head
   BBR_grub
+}
+
+#-----------------------------------------------------------------------
+# 函数: update_sysctl_interactive (V4 - 增加错误忽略参数)
+# 功能: 以交互方式安全地更新 sysctl 配置文件并应用。
+#       命令执行失败时，将不会回滚文件更改。
+#-----------------------------------------------------------------------
+update_sysctl_interactive() {
+    # 强制使用C语言环境，确保正则表达式的行为可预测且一致。
+    local LC_ALL=C
+
+    # --- 配置与参数解析 ---
+    local CONF_FILE="/etc/sysctl.d/99-sysctl.conf"
+    local TMP_FILE
+    local BACKUP_FILE
+    local ignore_apply_error=true
+
+    # --- 帮助函数 ---
+    log_info() {
+        echo "[INFO] $1"
+    }
+
+    log_error() {
+        echo "[ERROR] $1" >&2
+    }
+    
+    log_warn() {
+        echo "[WARN] $1" >&2
+    }
+
+    # --- 主逻辑 ---
+
+    # 1. 权限检查
+    if [[ $EUID -ne 0 ]]; then
+       log_error "此函数必须以 root 权限运行，请使用 sudo。"
+       return 1
+    fi
+
+    # 2. 交互式获取用户输入
+    log_info "请输入或粘贴您要设置的 sysctl 参数 (格式: key = value)。"
+    log_info "注释行(以 # 或 ; 开头)和空行将被忽略。"
+    log_info "输入完成后，请按 Ctrl+D 结束输入。"
+    
+    readarray -t user_input
+
+    if [ ${#user_input[@]} -eq 0 ]; then
+        log_info "没有接收到任何输入，操作已取消。"
+        return 0
+    fi
+
+    # 确保配置文件存在
+    touch "$CONF_FILE"
+
+    # 3. 创建临时文件
+    TMP_FILE=$(mktemp) || { log_error "无法创建临时文件"; return 1; }
+    trap 'rm -f "$TMP_FILE"' RETURN
+
+    cp "$CONF_FILE" "$TMP_FILE"
+
+    local -A params_to_add
+    local all_params_valid=true
+
+    # 4. 预处理所有输入，检查合法性
+    log_info "正在校验所有输入参数..."
+    for line in "${user_input[@]}"; do
+        trimmed_line=$(echo "$line" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        if [[ -z "$trimmed_line" ]] || [[ "$trimmed_line" =~ ^[[:space:]]*[#\;] ]]; then
+            continue
+        fi
+        
+        if ! [[ "$trimmed_line" =~ ^[[:space:]]*([a-zA-Z0-9._-]+)[[:space:]]*=[[:space:]]*(.*)[[:space:]]*$ ]]; then
+            log_error "格式无效: '$trimmed_line'. 期望格式为 'key = value'."
+            all_params_valid=false
+            continue
+        fi
+
+        local key="${BASH_REMATCH[1]}"
+        local value="${BASH_REMATCH[2]}"
+        
+        if ! sysctl -N "$key" >/dev/null 2>&1; then
+            log_error "参数键名无效: '$key' 不是一个有效的内核参数。"
+            all_params_valid=false
+            continue
+        fi
+
+        local formatted_param="$key = $value"
+
+        if grep -q -E "^[[:space:]]*${key//./\\.}([[:space:]]*)=.*" "$TMP_FILE"; then
+            sed -i -E "s|^[[:space:]]*${key//./\\.}([[:space:]]*)=.*|$formatted_param|" "$TMP_FILE"
+            log_info "已更新参数: $formatted_param"
+        else
+            if [[ -z "${params_to_add[$key]}" ]]; then
+                 params_to_add["$key"]="$formatted_param"
+            fi
+        fi
+    done
+
+    if ! $all_params_valid; then
+        log_error "检测到无效参数，操作已中止。配置文件未做任何更改。"
+        return 1
+    fi
+
+    # 5. 将所有新参数追加到临时文件末尾
+    if [ ${#params_to_add[@]} -gt 0 ]; then
+        log_info "正在添加新参数..."
+        echo "" >> "$TMP_FILE"
+        for key in "${!params_to_add[@]}"; do
+            echo "${params_to_add[$key]}" >> "$TMP_FILE"
+            log_info "已添加新参数: ${params_to_add[$key]}"
+        done
+    fi
+
+    # 6. 原子替换与应用
+    BACKUP_FILE="${CONF_FILE}.bak_$(date +%Y%m%d_%H%M%S)"
+    cp "$CONF_FILE" "$BACKUP_FILE"
+    log_info "原始文件已备份到 $BACKUP_FILE"
+
+    mv "$TMP_FILE" "$CONF_FILE"
+    chown root:root "$CONF_FILE"
+    chmod 644 "$CONF_FILE"
+    trap - RETURN 
+
+    # 7. 应用配置并进行错误处理
+    log_info "正在应用新的 sysctl 设置..."
+    if apply_output=$(sysctl -p "$CONF_FILE" 2>&1); then
+        log_info "Sysctl 设置已成功应用。"
+        echo "--- 应用输出 ---"
+        echo "$apply_output"
+        echo "------------------"
+        rm -f "$BACKUP_FILE"
+    else
+        # 应用失败时的逻辑
+        if [[ "$ignore_apply_error" == "true" ]]; then
+            log_warn "应用 sysctl 设置失败，但根据指令已忽略错误。"
+            log_warn "配置文件 '${CONF_FILE}' 已被更新，但部分设置可能未生效。"
+            log_warn "--- 错误详情 ---"
+            echo "$apply_output" >&2
+            echo "------------------"
+            rm -f "$BACKUP_FILE" # 忽略错误，所以也删除备份
+            return 0 # 返回成功状态
+        else
+            log_error "应用 sysctl 设置失败！正在回滚..."
+            log_error "--- 错误详情 ---"
+            echo "$apply_output"
+            echo "------------------"
+            
+            mv "$BACKUP_FILE" "$CONF_FILE"
+            log_info "正在恢复到之前的设置..."
+            sysctl -p "$CONF_FILE" >/dev/null 2>&1
+            
+            log_error "回滚完成。配置文件已恢复，问题备份文件保留在 $BACKUP_FILE"
+            return 1
+        fi
+    fi
+    
+    return 0
 }
 
 #更新引导
