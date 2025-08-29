@@ -339,7 +339,7 @@ while [ $# -gt 0 ]; do
     exit
     ;;
   op3)
-    optimizing_system_radicalizate # 调用函数
+    update_sysctl_interactive # 调用函数
     exit
     ;;
   *)
@@ -1372,7 +1372,7 @@ start_menu() {
  ${Green_font_prefix}17.${Font_color_suffix} 开启ECN	 		${Green_font_prefix}18.${Font_color_suffix} 关闭ECN
  ${Green_font_prefix}19.${Font_color_suffix} 使用BBRplus+FQ版加速       ${Green_font_prefix}20.${Font_color_suffix} 使用Lotserver(锐速)加速
  ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧		${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
- ${Green_font_prefix}27.${Font_color_suffix} 手动提交合并内核参数	${Green_font_prefix}28.${Font_color_suffix} 编译安装brutal模块
+ ${Green_font_prefix}61.${Font_color_suffix} 手动提交合并内核参数	${Green_font_prefix}28.${Font_color_suffix} 编译安装brutal模块
  ${Green_font_prefix}23.${Font_color_suffix} 禁用IPv6	 		${Green_font_prefix}24.${Font_color_suffix} 开启IPv6
  ${Green_font_prefix}51.${Font_color_suffix} 查看排序内核               ${Green_font_prefix}52.${Font_color_suffix} 删除保留指定内核
  ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速	 	${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
