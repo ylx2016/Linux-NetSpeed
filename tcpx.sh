@@ -5,7 +5,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.7
+#	Version: 100.0.4.8
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -16,7 +16,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.7"
+sh_ver="100.0.4.8"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -2276,7 +2276,7 @@ check_sys_official_xanmod_main() {
     echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
     wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
     if [[ "${cpu_level}" == "4" ]]; then
-      apt update && apt install linux-xanmod-x64v4 -y
+      apt update && apt install linux-xanmod-x64v3 -y
     elif [[ "${cpu_level}" == "3" ]]; then
       apt update && apt install linux-xanmod-x64v3 -y
     elif [[ "${cpu_level}" == "2" ]]; then
@@ -2310,7 +2310,7 @@ check_sys_official_xanmod_lts() {
     echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
     wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
     if [[ "${cpu_level}" == "4" ]]; then
-      apt update && apt install linux-xanmod-lts-x64v4 -y
+      apt update && apt install linux-xanmod-lts-x64v3 -y
     elif [[ "${cpu_level}" == "3" ]]; then
       apt update && apt install linux-xanmod-lts-x64v3 -y
     elif [[ "${cpu_level}" == "2" ]]; then
@@ -2344,7 +2344,7 @@ check_sys_official_xanmod_edge() {
     echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
     wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
     if [[ "${cpu_level}" == "4" ]]; then
-      apt update && apt install linux-xanmod-edge-x64v4 -y
+      apt update && apt install linux-xanmod-edge-x64v3 -y
     elif [[ "${cpu_level}" == "3" ]]; then
       apt update && apt install linux-xanmod-edge-x64v3 -y
     elif [[ "${cpu_level}" == "2" ]]; then
