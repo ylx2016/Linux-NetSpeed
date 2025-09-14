@@ -5,7 +5,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.8
+#	Version: 100.0.4.9
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -16,7 +16,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.8"
+sh_ver="100.0.4.9"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -2456,17 +2456,19 @@ check_status() {
     run_status="未安装加速模块"
   fi
 
-  # Headers 状态检测（三种状态）
-  local installed_headers=$(dpkg -l | grep "linux-headers" | awk '{print $2}' | grep -v '^$' || echo "")
-  if [[ -z "$installed_headers" ]]; then
-    headers_status="未安装"
+  # 检查 CentOS 上是否安装了 kernel-headers 或 kernel-devel，并检测状态
+kernel_version_full=$(uname -r)  # 获取当前内核版本
+installed_headers=$(rpm -qa | grep -E "kernel-devel|kernel-headers" | grep -v '^$' || echo "")
+
+if [[ -z "$installed_headers" ]]; then
+  headers_status="未安装"
+else
+  if echo "$installed_headers" | grep -q "kernel-devel-${kernel_version_full}\\|kernel-headers-${kernel_version_full}"; then
+    headers_status="已匹配"
   else
-    if echo "$installed_headers" | grep -q "^linux-headers-${kernel_version_full}$"; then
-      headers_status="已匹配"
-    else
-      headers_status="未匹配"
-    fi
+    headers_status="未匹配"
   fi
+fi
 
   # Brutal 状态检测
   brutal=""
