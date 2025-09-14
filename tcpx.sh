@@ -5,7 +5,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.9
+#	Version: 100.0.4.10
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -16,7 +16,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.9"
+sh_ver="100.0.4.10"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -1969,23 +1969,35 @@ check_sys() {
     fi
     echo 'CA证书检查OK'
 
-    # 检查并安装 curl、wget 和 dmidecode 包
-    for pkg in curl wget dmidecode redhat-lsb-core; do
-      if ! type $pkg >/dev/null 2>&1; then
-        echo "未安装 $pkg，正在安装..."
-        yum install $pkg -y
-      else
-        echo "$pkg 已安装。"
-      fi
-    done
+    # 检查并安装 curl、wget、dmidecode 和 redhat-lsb-core 包
+for pkg in curl wget dmidecode redhat-lsb-core; do
+  if ! rpm -q "$pkg" >/dev/null 2>&1; then
+    echo "未安装 $pkg，正在安装..."
+    yum install -y "$pkg"
+  else
+    echo "$pkg 已安装。"
+  fi
+done
 
-    if [ -x "$(command -v lsb_release)" ]; then
-      echo "lsb_release 已安装"
-    else
-      echo "lsb_release 未安装，现在开始安装..."
-      yum install epel-release -y
-      yum install redhat-lsb-core -y
-    fi
+# 专门检查 lsb_release 命令
+if command -v lsb_release >/dev/null 2>&1; then
+  echo "lsb_release 已安装。"
+else
+  echo "lsb_release 未安装，尝试安装 redhat-lsb-core..."
+  # 确保 epel-release 已安装（如果需要）
+  if ! rpm -q epel-release >/dev/null 2>&1; then
+    echo "安装 epel-release..."
+    yum install -y epel-release
+  fi
+  # 再次尝试安装 redhat-lsb-core
+  yum install -y redhat-lsb-core
+  # 验证 lsb_release 是否安装成功
+  if command -v lsb_release >/dev/null 2>&1; then
+    echo "lsb_release 安装成功。"
+  else
+    echo "错误：无法安装 lsb_release，请检查 yum 存储库或包的可用性。"
+  fi
+fi
 
   elif [[ "${OS_type}" == "Debian" ]]; then
     # 检查是否安装了 ca-certificates 包，如果未安装则安装
