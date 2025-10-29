@@ -5,7 +5,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.12
+#	Version: 100.0.4.13
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -16,7 +16,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.12"
+sh_ver="100.0.4.13"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -1355,156 +1355,164 @@ net.ipv6.conf.default.accept_ra = 2" >>/etc/sysctl.d/99-sysctl.conf
 
 #开始菜单
 start_menu() {
-	clear
-	echo && echo -e " TCP加速 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}] 不卸内核${Font_color_suffix} from blog.ylx.me 母鸡慎用
+    clear
+    echo && echo -e " TCP加速 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}] 不卸内核${Font_color_suffix} from blog.ylx.me 母鸡慎用
  ${Green_font_prefix}0.${Font_color_suffix} 升级脚本
- ${Green_font_prefix}9.${Font_color_suffix} 切换到卸载内核版本		${Green_font_prefix}10.${Font_color_suffix} 切换到一键DD系统脚本
+ ${Green_font_prefix}9.${Font_color_suffix} 切换到卸载内核版本        ${Green_font_prefix}10.${Font_color_suffix} 切换到一键DD系统脚本
  ${Green_font_prefix}60.${Font_color_suffix} 切换到检查当前IP质量/媒体解锁/邮箱通信脚本
- ${Green_font_prefix}1.${Font_color_suffix} 安装 BBR原版内核		${Green_font_prefix}7.${Font_color_suffix} 安装 Zen官方版内核
- ${Green_font_prefix}2.${Font_color_suffix} 安装 BBRplus版内核		${Green_font_prefix}5.${Font_color_suffix} 安装 BBRplus新版内核
- ${Green_font_prefix}3.${Font_color_suffix} 安装 Lotserver(锐速)内核	${Green_font_prefix}36.${Font_color_suffix} 安装 XANMOD官方内核(EDGE)
- ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核		${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核 backports/elrepo
- ${Green_font_prefix}8.${Font_color_suffix} 安装 官方cloud内核 (支持debian系列)
- ${Green_font_prefix}32.${Font_color_suffix} 安装 XANMOD官方内核(main)	${Green_font_prefix}33.${Font_color_suffix} 安装 XANMOD官方内核(LTS)
- ${Green_font_prefix}11.${Font_color_suffix} 使用BBR+FQ加速		${Green_font_prefix}12.${Font_color_suffix} 使用BBR+FQ_PIE加速 
- ${Green_font_prefix}13.${Font_color_suffix} 使用BBR+CAKE加速		${Green_font_prefix}14.${Font_color_suffix} 使用BBR2+FQ加速
- ${Green_font_prefix}15.${Font_color_suffix} 使用BBR2+FQ_PIE加速	${Green_font_prefix}16.${Font_color_suffix} 使用BBR2+CAKE加速
- ${Green_font_prefix}17.${Font_color_suffix} 开启ECN	 		${Green_font_prefix}18.${Font_color_suffix} 关闭ECN
- ${Green_font_prefix}19.${Font_color_suffix} 使用BBRplus+FQ版加速       ${Green_font_prefix}20.${Font_color_suffix} 使用Lotserver(锐速)加速
- ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧		${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
- ${Green_font_prefix}61.${Font_color_suffix} 手动提交合并内核参数	${Green_font_prefix}28.${Font_color_suffix} 编译安装brutal模块
- ${Green_font_prefix}23.${Font_color_suffix} 禁用IPv6	 		${Green_font_prefix}24.${Font_color_suffix} 开启IPv6
- ${Green_font_prefix}51.${Font_color_suffix} 查看排序内核               ${Green_font_prefix}52.${Font_color_suffix} 删除保留指定内核
- ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速	 	${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
+ ———————————————————————————— 内核安装 —————————————————————————————
+ ${Green_font_prefix}1.${Font_color_suffix} 安装 BBR原版内核          ${Green_font_prefix}7.${Font_color_suffix} 安装 Zen官方版内核
+ ${Green_font_prefix}2.${Font_color_suffix} 安装 BBRplus版内核        ${Green_font_prefix}5.${Font_color_suffix} 安装 BBRplus新版内核
+ ${Green_font_prefix}3.${Font_color_suffix} 安装 Lotserver(锐速)内核  ${Green_font_prefix}8.${Font_color_suffix} 安装 官方cloud内核
+ ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核        ${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核
+ ${Green_font_prefix}32.${Font_color_suffix} 安装 XANMOD(main)        ${Green_font_prefix}33.${Font_color_suffix} 安装 XANMOD(LTS)
+ ${Green_font_prefix}36.${Font_color_suffix} 安装 XANMOD(EDGE)        ${Green_font_prefix}37.${Font_color_suffix} 安装 XANMOD(RT)
+ ———————————————————————————— 加速启用 —————————————————————————————
+ ${Green_font_prefix}11.${Font_color_suffix} 使用BBR+FQ加速           ${Green_font_prefix}12.${Font_color_suffix} 使用BBR+FQ_PIE加速 
+ ${Green_font_prefix}13.${Font_color_suffix} 使用BBR+CAKE加速         ${Green_font_prefix}14.${Font_color_suffix} 使用BBR2+FQ加速
+ ${Green_font_prefix}15.${Font_color_suffix} 使用BBR2+FQ_PIE加速      ${Green_font_prefix}16.${Font_color_suffix} 使用BBR2+CAKE加速
+ ${Green_font_prefix}19.${Font_color_suffix} 使用BBRplus+FQ版加速     ${Green_font_prefix}20.${Font_color_suffix} 使用Lotserver(锐速)加速
+ ${Green_font_prefix}28.${Font_color_suffix} 编译安装brutal模块
+ ———————————————————————————— 系统配置 —————————————————————————————
+ ${Green_font_prefix}17.${Font_color_suffix} 开启ECN                  ${Green_font_prefix}18.${Font_color_suffix} 关闭ECN
+ ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧           ${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
+ ${Green_font_prefix}23.${Font_color_suffix} 禁用IPv6                 ${Green_font_prefix}24.${Font_color_suffix} 开启IPv6
+ ${Green_font_prefix}61.${Font_color_suffix} 手动提交合并内核参数
+ ———————————————————————————— 内核管理 —————————————————————————————
+ ${Green_font_prefix}51.${Font_color_suffix} 查看排序内核             ${Green_font_prefix}52.${Font_color_suffix} 删除保留指定内核
+ ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速             ${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
 ————————————————————————————————————————————————————————————————" &&
-		check_status
-	get_system_info
-	echo -e " 信息： ${Font_color_suffix}$opsy ${Green_font_prefix}$virtual${Font_color_suffix} $arch ${Green_font_prefix}$kern${Font_color_suffix} "
-	if [[ ${kernel_status} == "noinstall" ]]; then
-		echo -e " 状态: ${Green_font_prefix}未安装${Font_color_suffix} 加速内核 ${Red_font_prefix}请先安装内核${Font_color_suffix}"
-	else
-		echo -e " 状态: ${Green_font_prefix}已安装${Font_color_suffix} ${Red_font_prefix}${kernel_status}${Font_color_suffix} 加速内核 , ${Green_font_prefix}${run_status}${Font_color_suffix} ${Red_font_prefix}${brutal}${Font_color_suffix}"
+        check_status
+    get_system_info
+    echo -e " 信息： ${Font_color_suffix}$opsy ${Green_font_prefix}$virtual${Font_color_suffix} $arch ${Green_font_prefix}$kern${Font_color_suffix} "
+    if [[ ${kernel_status} == "noinstall" ]]; then
+        echo -e " 状态: ${Green_font_prefix}未安装${Font_color_suffix} 加速内核 ${Red_font_prefix}请先安装内核${Font_color_suffix}"
+    else
+        echo -e " 状态: ${Green_font_prefix}已安装${Font_color_suffix} ${Red_font_prefix}${kernel_status}${Font_color_suffix} 加速内核 , ${Green_font_prefix}${run_status}${Font_color_suffix} ${Red_font_prefix}${brutal}${Font_color_suffix}"
 
-	fi
-	echo -e " 拥塞控制算法: ${Green_font_prefix}${net_congestion_control}${Font_color_suffix} 队列算法: ${Green_font_prefix}${net_qdisc}${Font_color_suffix} 内核headers：${Green_font_prefix}${headers_status}${Font_color_suffix}"
+    fi
+    echo -e " 拥塞控制算法:: ${Green_font_prefix}${net_congestion_control}${Font_color_suffix} 队列算法: ${Green_font_prefix}${net_qdisc}${Font_color_suffix} 内核headers：${Green_font_prefix}${headers_status}${Font_color_suffix}"
 
-	read -p " 请输入数字 :" num
-	case "$num" in
-	0)
-		Update_Shell
-		;;
-	1)
-		check_sys_bbr
-		;;
-	2)
-		check_sys_bbrplus
-		;;
-	3)
-		check_sys_Lotsever
-		;;
-	5)
-		check_sys_bbrplusnew
-		;;
-	7)
-		check_sys_official_zen
-		;;
-	8)
-		check_sys_cloud
-		;;
-	30)
-		check_sys_official
-		;;
-	31)
-		check_sys_official_bbr
-		;;
-	32)
-		check_sys_official_xanmod_main
-		;;
-	33)
-		check_sys_official_xanmod_lts
-		;;
-	36)
-		check_sys_official_xanmod_edge
-		;;
-	9)
-		gototcp
-		;;
-	10)
-		gotodd
-		;;
-	60)
-		gotoipcheck
-		;;
-	11)
-		startbbrfq
-		;;
-	12)
-		startbbrfqpie
-		;;
-	13)
-		startbbrcake
-		;;
-	14)
-		startbbr2fq
-		;;
-	15)
-		startbbr2fqpie
-		;;
-	16)
-		startbbr2cake
-		;;
-	17)
-		startecn
-		;;
-	18)
-		closeecn
-		;;
-	19)
-		startbbrplus
-		;;
-	20)
-		startlotserver
-		;;
-	21)
-		optimizing_system_old
-		;;
-	22)
-		optimizing_system_johnrosen1
-		;;
-	23)
-		closeipv6
-		;;
-	24)
-		openipv6
-		;;
-	25)
-		remove_all
-		;;
-	26)
-		optimizing_ddcc
-		;;
-	28)
-		startbrutal
-		;;
-	51)
-		BBR_grub
-		;;
-	52)
-		detele_kernel_custom
-		;;
-	61)
-		update_sysctl_interactive
-		;;
-	99)
-		exit 1
-		;;
-	*)
-		clear
-		echo -e "${Error}:请输入正确数字 [0-99]"
-		sleep 5s
-		start_menu
-		;;
-	esac
+    read -p " 请输入数字 :" num
+    case "$num" in
+    0)
+        Update_Shell
+        ;;
+    1)
+        check_sys_bbr
+        ;;
+    2)
+        check_sys_bbrplus
+        ;;
+    3)
+        check_sys_Lotsever
+        ;;
+    5)
+        check_sys_bbrplusnew
+        ;;
+    7)
+        check_sys_official_zen
+        ;;
+    8)
+        check_sys_cloud
+        ;;
+    30)
+        check_sys_official
+        ;;
+    31)
+        check_sys_official_bbr
+        ;;
+    32)
+        check_sys_official_xanmod_main
+        ;;
+    33)
+        check_sys_official_xanmod_lts
+        ;;
+    36)
+        check_sys_official_xanmod_edge
+        ;;
+    37)
+        check_sys_official_xanmod_rt
+        ;;
+    9)
+        gototcp
+        ;;
+    10)
+        gotodd
+        ;;
+    60)
+        gotoipcheck
+        ;;
+    11)
+        startbbrfq
+        ;;
+    12)
+        startbbrfqpie
+        ;;
+    13)
+        startbbrcake
+        ;;
+    14)
+        startbbr2fq
+        ;;
+    15)
+        startbbr2fqpie
+        ;;
+    16)
+        startbbr2cake
+        ;;
+    17)
+        startecn
+        ;;
+    18)
+        closeecn
+        ;;
+    19)
+        startbbrplus
+        ;;
+    20)
+        startlotserver
+        ;;
+    21)
+        optimizing_system_old
+        ;;
+    22)
+        optimizing_system_johnrosen1
+        ;;
+    23)
+        closeipv6
+        ;;
+    24)
+        openipv6
+        ;;
+    25)
+        remove_all
+        ;;
+    26)
+        optimizing_ddcc
+        ;;
+    28)
+        startbrutal
+        ;;
+    51)
+        BBR_grub
+        ;;
+    52)
+        detele_kernel_custom
+        ;;
+    61)
+        update_sysctl_interactive
+        ;;
+    99)
+        exit 1
+        ;;
+    *)
+        clear
+        echo -e "${Error}:请输入正确数字 [0-99]"
+        sleep 5s
+        start_menu
+        ;;
+    esac
 }
 #############内核管理组件#############
 
@@ -2343,7 +2351,7 @@ check_sys_official_xanmod_lts() {
 	echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
-#检查官方xanmod lts内核并安装
+#检查官方xanmod edge内核并安装
 check_sys_official_xanmod_edge() {
 	check_version
 	wget -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
@@ -2369,6 +2377,41 @@ check_sys_official_xanmod_edge() {
 			apt update && apt install linux-xanmod-edge-x64v2 -y
 		else
 			apt update && apt install linux-xanmod-edge-x64v1 -y
+		fi
+	else
+		echo -e "${Error} 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+	fi
+
+	BBR_grub
+	echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
+}
+
+#检查官方xanmod rt内核并安装
+check_sys_official_xanmod_rt() {
+	check_version
+	wget -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
+	chmod +x check_x86-64_psabi.sh
+	cpu_level=$(./check_x86-64_psabi.sh | awk -F 'v' '{print $2}')
+	echo -e "CPU supports \033[32m${cpu_level}\033[0m"
+	# exit
+	if [[ ${bit} != "x86_64" ]]; then
+		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+	fi
+
+	if [[ "${OS_type}" == "Debian" ]]; then
+		apt update
+		apt-get install gnupg gnupg2 gnupg1 sudo -y
+		echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
+		# --[ 已修改 ]-- 使用 gpg --dearmor 替换 apt-key
+		wget -qO - https://dl.xanmod.org/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
+		if [[ "${cpu_level}" == "4" ]]; then
+			apt update && apt install linux-xanmod-rt-x64v3 -y
+		elif [[ "${cpu_level}" == "3" ]]; then
+			apt update && apt install linux-xanmod-rt-x64v3 -y
+		elif [[ "${cpu_level}" == "2" ]]; then
+			apt update && apt install linux-xanmod-rt-x64v2 -y
+		else
+			apt update && apt install linux-xanmod-rt-x64v1 -y
 		fi
 	else
 		echo -e "${Error} 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
