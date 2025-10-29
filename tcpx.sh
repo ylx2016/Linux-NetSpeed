@@ -5,7 +5,7 @@ export PATH
 #=================================================
 #	System Required: CentOS 7/8,Debian/ubuntu,oraclelinux
 #	Description: BBR+BBRplus+Lotserver
-#	Version: 100.0.4.11
+#	Version: 100.0.4.12
 #	Author: 千影,cx9208,YLX
 #	更新内容及反馈:  https://blog.ylx.me/archives/783.html
 #=================================================
@@ -16,7 +16,7 @@ export PATH
 # SKYBLUE='\033[0;36m'
 # PLAIN='\033[0m'
 
-sh_ver="100.0.4.11"
+sh_ver="100.0.4.12"
 github="raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 
 imgurl=""
@@ -2289,7 +2289,8 @@ check_sys_official_xanmod_main() {
 		apt update
 		apt-get install gnupg gnupg2 gnupg1 sudo -y
 		echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
-		wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
+		# --[ 已修改 ]-- 使用 gpg --dearmor 替换 apt-key
+		wget -qO - https://dl.xanmod.org/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
 		if [[ "${cpu_level}" == "4" ]]; then
 			apt update && apt install linux-xanmod-x64v3 -y
 		elif [[ "${cpu_level}" == "3" ]]; then
@@ -2323,7 +2324,8 @@ check_sys_official_xanmod_lts() {
 		apt update
 		apt-get install gnupg gnupg2 gnupg1 sudo -y
 		echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
-		wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
+		# --[ 已修改 ]-- 使用 gpg --dearmor 替换 apt-key
+		wget -qO - https://dl.xanmod.org/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
 		if [[ "${cpu_level}" == "4" ]]; then
 			apt update && apt install linux-xanmod-lts-x64v3 -y
 		elif [[ "${cpu_level}" == "3" ]]; then
@@ -2357,7 +2359,8 @@ check_sys_official_xanmod_edge() {
 		apt update
 		apt-get install gnupg gnupg2 gnupg1 sudo -y
 		echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
-		wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
+		# --[ 已修改 ]-- 使用 gpg --dearmor 替换 apt-key
+		wget -qO - https://dl.xanmod.org/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
 		if [[ "${cpu_level}" == "4" ]]; then
 			apt update && apt install linux-xanmod-edge-x64v3 -y
 		elif [[ "${cpu_level}" == "3" ]]; then
