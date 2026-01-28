@@ -1361,13 +1361,13 @@ net.ipv6.conf.default.accept_ra = 2" >>/etc/sysctl.d/99-sysctl.conf
 start_menu() {
 	clear
 	echo && echo -e " TCP加速 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}] 不卸内核${Font_color_suffix} from blog.ylx.me 母鸡慎用
- ${Green_font_prefix}0.${Font_color_suffix} 升级脚本
- ${Green_font_prefix}9.${Font_color_suffix} 切换到卸载内核版本        ${Green_font_prefix}10.${Font_color_suffix} 切换到一键DD系统脚本
+ ${Green_font_prefix}0.${Font_color_suffix}  升级脚本
+ ${Green_font_prefix}9.${Font_color_suffix}  切换到卸载内核版本        ${Green_font_prefix}10.${Font_color_suffix} 切换到一键DD系统脚本
  ${Green_font_prefix}60.${Font_color_suffix} 切换到检查当前IP质量/媒体解锁/邮箱通信脚本
  ———————————————————————————— 内核安装 —————————————————————————————
- ${Green_font_prefix}1.${Font_color_suffix} 安装 BBR原版内核          ${Green_font_prefix}7.${Font_color_suffix} 安装 Zen官方版内核
- ${Green_font_prefix}2.${Font_color_suffix} 安装 BBRplus版内核        ${Green_font_prefix}5.${Font_color_suffix} 安装 BBRplus新版内核
- ${Green_font_prefix}3.${Font_color_suffix} 安装 Lotserver(锐速)内核  ${Green_font_prefix}8.${Font_color_suffix} 安装 官方cloud内核
+ ${Green_font_prefix}1.${Font_color_suffix}  安装 BBR原版内核         ${Green_font_prefix}7.${Font_color_suffix}  安装 Zen官方版内核
+ ${Green_font_prefix}2.${Font_color_suffix}  安装 BBRplus版内核       ${Green_font_prefix}5.${Font_color_suffix}  安装 BBRplus新版内核
+ ${Green_font_prefix}3.${Font_color_suffix}  安装 Lotserver(锐速)内核 ${Green_font_prefix}8.${Font_color_suffix}  安装 官方cloud内核
  ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核        ${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核
  ${Green_font_prefix}32.${Font_color_suffix} 安装 XANMOD(main)        ${Green_font_prefix}33.${Font_color_suffix} 安装 XANMOD(LTS)
  ${Green_font_prefix}36.${Font_color_suffix} 安装 XANMOD(EDGE)        ${Green_font_prefix}37.${Font_color_suffix} 安装 XANMOD(RT)
@@ -1592,7 +1592,7 @@ detele_kernel_head() {
 
 detele_kernel_custom() {
 	BBR_grub
-	read -p " 查看上面内核输入需保留保留保留的内核关键词(如:5.15.0-11) :" kernel_version
+	read -p " 查看上面内核输入需保留的内核关键词(如:5.15.0-11) :" kernel_version
 	detele_kernel
 	detele_kernel_head
 	BBR_grub
