@@ -88,7 +88,7 @@ net.ipv4.tcp_max_orphans = 32768
 	echo "*               soft    nofile           1000000
 *               hard    nofile          1000000" >/etc/security/limits.conf
 	echo "ulimit -SHn 1000000" >>/etc/profile
-	read -p "需要重启VPS后，才能生效系统优化配置，是否现在重启 ? [Y/n] :" yn
+	read -p "需要重启 VPS 后，才能生效系统优化配置，是否现在重启 ? [Y/n] :" yn
 	[ -z "${yn}" ] && yn="y"
 	if [[ $yn == [Yy] ]]; then
 		echo -e "${Info} VPS 重启中..."
@@ -200,7 +200,7 @@ net.ipv4.conf.all.route_localnet=1
 net.ipv4.ip_forward = 1
 net.ipv4.conf.all.forwarding = 1
 net.ipv4.conf.default.forwarding = 1
-#net.ipv6.conf.all.forwarding = 1  #awsipv6问题
+#net.ipv6.conf.all.forwarding = 1  #awsipv6 问题
 net.ipv6.conf.default.forwarding = 1
 net.ipv6.conf.lo.forwarding = 1
 net.ipv6.conf.all.disable_ipv6 = 0
@@ -319,7 +319,7 @@ EOF
 		echo "session required pam_limits.so" >>/etc/pam.d/common-session
 	fi
 	systemctl daemon-reload
-	echo -e "${Info}优化方案2应用结束，可能需要重启！"
+	echo -e "${Info}优化方案 2 应用结束，可能需要重启！"
 }
 
 #处理传进来的参数 直接优化
@@ -353,13 +353,13 @@ while [ $# -gt 0 ]; do
 	shift # 移动到下一个参数
 done
 
-# 检查github网络
+# 检查 github 网络
 check_github() {
 	# 检测域名的可访问性函数
 	check_domain() {
 		local domain="$1"
 		if ! curl --max-time 5 --head --silent --fail "$domain" >/dev/null; then
-			echo -e "${Error}无法访问 $domain，请检查网络或者本地DNS 或者访问频率过快而受限"
+			echo -e "${Error}无法访问 $domain，请检查网络或者本地 DNS 或者访问频率过快而受限"
 			github_network=0
 		fi
 	}
@@ -370,11 +370,11 @@ check_github() {
 	check_domain "https://github.com"
 
 	if [ "$github_network" -eq 0 ]; then
-		echo -e "${Error}github网络访问受限，将影响内核的安装以及脚本的检查更新，1秒后继续运行脚本"
+		echo -e "${Error}github 网络访问受限，将影响内核的安装以及脚本的检查更新，1 秒后继续运行脚本"
 		sleep 1
 	else
 		# 所有域名均可访问，打印成功提示
-		echo -e "${Green_font_prefix}github可访问${Font_color_suffix}，继续执行脚本..."
+		echo -e "${Green_font_prefix}github 可访问${Font_color_suffix}，继续执行脚本..."
 	fi
 }
 
@@ -385,7 +385,7 @@ checkurl() {
 	local retryDelay=2
 
 	if [[ -z "$url" ]]; then
-		echo "错误：缺少URL参数！"
+		echo "错误：缺少 URL 参数！"
 		exit 1
 	fi
 
@@ -402,16 +402,16 @@ checkurl() {
 	done
 
 	if [[ -n "$responseCode" && ("$responseCode" == "200" || "$responseCode" =~ ^3[0-9]{2}$) ]]; then
-		echo "下载地址检查OK，继续！"
+		echo "下载地址检查 OK，继续！"
 	else
 		echo "下载地址检查出错，退出！"
 		exit 1
 	fi
 }
 
-#cn处理github加速
+#cn 处理 github 加速
 check_cn() {
-	# 检查是否安装了jq命令，如果没有安装则进行安装
+	# 检查是否安装了 jq 命令，如果没有安装则进行安装
 	if ! command -v jq >/dev/null 2>&1; then
 		if command -v yum >/dev/null 2>&1; then
 			sudo yum install epel-release -y
@@ -420,15 +420,15 @@ check_cn() {
 			sudo apt-get update
 			sudo apt-get install -y jq
 		else
-			echo "无法安装jq命令。请手动安装jq后再试。"
+			echo "无法安装 jq 命令。请手动安装 jq 后再试。"
 			exit 1
 		fi
 	fi
 
-	# 获取当前IP地址，设置超时为3秒
+	# 获取当前 IP 地址，设置超时为 3 秒
 	#current_ip=$(curl -s --max-time 3 https://ip.im -4)
 
-	# 使用ip-api.com查询IP所在国家，设置超时为3秒
+	# 使用 ip-api.com 查询 IP 所在国家，设置超时为 3 秒
 	response=$(curl -s --max-time 3 ip.im/info -4 | sed -n '/CountryCode/s/.*://p')
 
 	# 检查国家是否为中国
@@ -474,9 +474,9 @@ download_file() {
 	status=$?
 
 	if [ $status -eq 0 ]; then
-		echo -e "\e[32m文件下载成功或已经是最新。\e[0m"
+		echo -e "\e[32m 文件下载成功或已经是最新。\e[0m"
 	else
-		echo -e "\e[31m文件下载失败，退出状态码: $status\e[0m"
+		echo -e "\e[31m 文件下载失败，退出状态码: $status\e[0m"
 		exit 1
 	fi
 }
@@ -514,7 +514,7 @@ check_disk_space() {
 	# 移除单位字符，例如"GB"，并将剩余空间转换为数字
 	available_space=$(echo "$available_space" | sed 's/G//')
 
-	# 如果剩余空间小于等于0，则输出警告信息
+	# 如果剩余空间小于等于 0，则输出警告信息
 	if [ $(echo "$available_space <= 0" | bc) -eq 1 ]; then
 		echo "警告：磁盘空间已用尽，请勿重启，先清理空间。建议先卸载刚才安装的内核来释放空间，仅供参考。"
 	else
@@ -522,7 +522,7 @@ check_disk_space() {
 	fi
 }
 
-#安装BBR内核
+#安装 BBR 内核
 installbbr() {
 	kernel_version="5.9.6"
 	bit=$(uname -m)
@@ -546,7 +546,7 @@ installbbr() {
 				yum install -y kernel-c7.rpm
 				yum install -y kernel-headers-c7.rpm
 			else
-				echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+				echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 			fi
 		fi
 
@@ -588,7 +588,7 @@ installbbr() {
 			dpkg -i linux-image-d10.deb
 			dpkg -i linux-headers-d10.deb
 		else
-			echo -e "${Error} 不支持x86_64及arm64/aarch64以外的系统 !" && exit 1
+			echo -e "${Error} 不支持 x86_64 及 arm64/aarch64 以外的系统 !" && exit 1
 		fi
 	fi
 
@@ -599,7 +599,7 @@ installbbr() {
 	check_kernel
 }
 
-#安装BBRplus内核 4.14.129
+#安装 BBRplus 内核 4.14.129
 installbbrplus() {
 	kernel_version="4.14.160-bbrplus"
 	bit=$(uname -m)
@@ -621,7 +621,7 @@ installbbrplus() {
 				yum install -y kernel-c7.rpm
 				yum install -y kernel-headers-c7.rpm
 			else
-				echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+				echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 			fi
 		fi
 
@@ -641,7 +641,7 @@ installbbrplus() {
 			dpkg -i linux-image.deb
 			dpkg -i linux-headers.deb
 		else
-			echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+			echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 		fi
 	fi
 
@@ -651,11 +651,11 @@ installbbrplus() {
 	check_kernel
 }
 
-#安装Lotserver内核
+#安装 Lotserver 内核
 installlot() {
 	bit=$(uname -m)
 	if [[ ${bit} != "x86_64" ]]; then
-		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+		echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	fi
 	if [[ ${bit} == "x86_64" ]]; then
 		bit='x64'
@@ -756,15 +756,15 @@ installlot() {
 	check_kernel
 }
 
-#安装xanmod内核  from xanmod.org
+#安装 xanmod 内核  from xanmod.org
 installxanmod() {
-	echo -e "xanmod这个自编译版本不维护了，后续请用官方编译版本，知悉."
+	echo -e "xanmod 这个自编译版本不维护了，后续请用官方编译版本，知悉."
 	#https://api.github.com/repos/ylx2016/kernel/releases?page=1&per_page=100
 	#releases?page=1&per_page=100
 	kernel_version="5.5.1-xanmod1"
 	bit=$(uname -m)
 	if [[ ${bit} != "x86_64" ]]; then
-		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+		echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	fi
 	rm -rf xanmod
 	mkdir xanmod && cd xanmod || exit
@@ -784,7 +784,7 @@ installxanmod() {
 				yum install -y kernel-c7.rpm
 				yum install -y kernel-headers-c7.rpm
 			else
-				echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+				echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 			fi
 		elif [[ ${version} == "8" ]]; then
 			echo -e "如果下载地址出错，可能当前正在更新，超过半天还是出错请反馈，大陆自行解决污染问题"
@@ -817,7 +817,7 @@ installxanmod() {
 			dpkg -i linux-image-d10.deb
 			dpkg -i linux-headers-d10.deb
 		else
-			echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+			echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 		fi
 	fi
 
@@ -827,25 +827,25 @@ installxanmod() {
 	check_kernel
 }
 
-#安装bbr2内核 集成到xanmod内核了
-#安装bbrplus 新内核
-#2021.3.15 开始由https://github.com/UJX6N/bbrplus-5.19 替换bbrplusnew
-#2021.4.12 地址更新为https://github.com/ylx2016/kernel/releases
-#2021.9.2 再次改为https://github.com/UJX6N/bbrplus
-#2022.9.6 改为https://github.com/UJX6N/bbrplus-5.19
-#2022.11.24 改为https://github.com/UJX6N/bbrplus-6.x_stable
+#安装 bbr2 内核 集成到 xanmod 内核了
+#安装 bbrplus 新内核
+#2021.3.15 开始由 https://github.com/UJX6N/bbrplus-5.19 替换 bbrplusnew
+#2021.4.12 地址更新为 https://github.com/ylx2016/kernel/releases
+#2021.9.2 再次改为 https://github.com/UJX6N/bbrplus
+#2022.9.6 改为 https://github.com/UJX6N/bbrplus-5.19
+#2022.11.24 改为 https://github.com/UJX6N/bbrplus-6.x_stable
 
 installbbrplusnew() {
 	github_ver_plus=$(curl -s https://api.github.com/repos/UJX6N/bbrplus-6.x_stable/releases | grep /bbrplus-6.x_stable/releases/tag/ | head -1 | awk -F "[/]" '{print $8}' | awk -F "[\"]" '{print $1}')
 	github_ver_plus_num=$(curl -s https://api.github.com/repos/UJX6N/bbrplus-6.x_stable/releases | grep /bbrplus-6.x_stable/releases/tag/ | head -1 | awk -F "[/]" '{print $8}' | awk -F "[\"]" '{print $1}' | awk -F "[-]" '{print $1}')
-	echo -e "获取的UJX6N的bbrplus-6.x_stable版本号为:${Green_font_prefix}${github_ver_plus}${Font_color_suffix}"
+	echo -e "获取的 UJX6N 的 bbrplus-6.x_stable 版本号为:${Green_font_prefix}${github_ver_plus}${Font_color_suffix}"
 	echo -e "如果下载地址出错，可能当前正在更新，超过半天还是出错请反馈，大陆自行解决污染问题"
-	echo -e "${Green_font_prefix}安装失败这边反馈，内核问题给UJX6N反馈${Font_color_suffix}"
+	echo -e "${Green_font_prefix}安装失败这边反馈，内核问题给 UJX6N 反馈${Font_color_suffix}"
 	# kernel_version=$github_ver_plus
 
 	bit=$(uname -m)
 	#if [[ ${bit} != "x86_64" ]]; then
-	#  echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+	#  echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	#fi
 	rm -rf bbrplusnew
 	mkdir bbrplusnew && cd bbrplusnew || exit
@@ -865,7 +865,7 @@ installbbrplusnew() {
 				yum install -y kernel-c7.rpm
 				yum install -y kernel-headers-c7.rpm
 			else
-				echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+				echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 			fi
 		fi
 		if [[ ${version} == "8" ]]; then
@@ -883,7 +883,7 @@ installbbrplusnew() {
 				yum install -y kernel-c8.rpm
 				yum install -y kernel-headers-c8.rpm
 			else
-				echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+				echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 			fi
 		fi
 	elif [[ "${OS_type}" == "Debian" ]]; then
@@ -914,7 +914,7 @@ installbbrplusnew() {
 			dpkg -i linux-image-d10.deb
 			dpkg -i linux-headers-d10.deb
 		else
-			echo -e "${Error} 不支持x86_64及arm64/aarch64以外的系统 !" && exit 1
+			echo -e "${Error} 不支持 x86_64 及 arm64/aarch64 以外的系统 !" && exit 1
 		fi
 	fi
 
@@ -925,7 +925,7 @@ installbbrplusnew() {
 
 }
 
-#安装cloud内核
+#安装 cloud 内核
 installcloud() {
 
 	# 检查当前系统发行版
@@ -948,7 +948,7 @@ installcloud() {
 		exit 1
 	fi
 
-	echo "检测到架构 $ARCH，正在从官方源获取cloud内核版本..."
+	echo "检测到架构 $ARCH，正在从官方源获取 cloud 内核版本..."
 
 	# 获取 cloud 内核 .deb 文件列表
 	local DEB_FILES_RAW=$(curl -s "$IMAGE_URL" | grep -oP "$IMAGE_PATTERN")
@@ -969,18 +969,18 @@ installcloud() {
 
 	# 确保有可用版本
 	if [ ${#VERSIONS[@]} -eq 0 ]; then
-		echo "未找到可用的cloud内核版本，请检查网络或反馈。"
+		echo "未找到可用的 cloud 内核版本，请检查网络或反馈。"
 		exit 1
 	fi
 
-	echo "检测到 $DISTRO 系统（架构 $ARCH），以下是从 Debian 签名cloud内核列表中获取的版本（按从小到大排序，已去重）："
+	echo "检测到 $DISTRO 系统 （架构 $ARCH），以下是从 Debian 签名 cloud 内核列表中获取的版本（按从小到大排序，已去重）："
 	for i in "${!VERSIONS[@]}"; do
 		echo "  $i) [${VERSIONS[$i]}]"
 	done
 
 	# 默认选择最新版本
 	local DEFAULT_INDEX=$((${#VERSIONS[@]} - 1))
-	echo "请选择要安装的cloud内核版本（10秒后默认选择最新版本回车加速 ${VERSIONS[$DEFAULT_INDEX]}，输入'h'则使用apt安装非最新cloud及headers）："
+	echo "请选择要安装的 cloud 内核版本 （10 秒后默认选择最新版本回车加速 ${VERSIONS[$DEFAULT_INDEX]}，输入'h'则使用 apt 安装非最新 cloud 及 headers）："
 	read -t 10 -p "输入选项编号或'h': " CHOICE
 
 	# 检查是否使用 apt 安装 cloud 及 headers
@@ -1034,43 +1034,43 @@ installcloud() {
 
 }
 
-#启用BBR+fq
+#启用 BBR+fq
 startbbrfq() {
 	remove_bbr_lotserver
 	echo "net.core.default_qdisc=fq" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv4.tcp_congestion_control=bbr" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}BBR+FQ修改成功，重启生效！"
+	echo -e "${Info}BBR+FQ 修改成功，重启生效！"
 }
 
-#启用BBR+fq_pie
+#启用 BBR+fq_pie
 startbbrfqpie() {
 	remove_bbr_lotserver
 	echo "net.core.default_qdisc=fq_pie" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv4.tcp_congestion_control=bbr" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}BBR+FQ_PIE修改成功，重启生效！"
+	echo -e "${Info}BBR+FQ_PIE 修改成功，重启生效！"
 }
 
-#启用BBR+cake
+#启用 BBR+cake
 startbbrcake() {
 	remove_bbr_lotserver
 	echo "net.core.default_qdisc=cake" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv4.tcp_congestion_control=bbr" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}BBR+cake修改成功，重启生效！"
+	echo -e "${Info}BBR+cake 修改成功，重启生效！"
 }
 
-#启用BBRplus
+#启用 BBRplus
 startbbrplus() {
 	remove_bbr_lotserver
 	echo "net.core.default_qdisc=fq" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv4.tcp_congestion_control=bbrplus" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}BBRplus修改成功，重启生效！"
+	echo -e "${Info}BBRplus 修改成功，重启生效！"
 }
 
-#启用Lotserver
+#启用 Lotserver
 startlotserver() {
 	remove_bbr_lotserver
 	if [[ "${OS_type}" == "CentOS" ]]; then
@@ -1088,56 +1088,56 @@ maxmode=\"1\"" >>/appex/etc/config
 	start_menu
 }
 
-#启用BBR2+FQ
+#启用 BBR2+FQ
 startbbr2fq() {
 	remove_bbr_lotserver
 	echo "net.core.default_qdisc=fq" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv4.tcp_congestion_control=bbr2" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}BBR2修改成功，重启生效！"
+	echo -e "${Info}BBR2 修改成功，重启生效！"
 }
 
-#启用BBR2+FQ_PIE
+#启用 BBR2+FQ_PIE
 startbbr2fqpie() {
 	remove_bbr_lotserver
 	echo "net.core.default_qdisc=fq_pie" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv4.tcp_congestion_control=bbr2" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}BBR2修改成功，重启生效！"
+	echo -e "${Info}BBR2 修改成功，重启生效！"
 }
 
-#启用BBR2+CAKE
+#启用 BBR2+CAKE
 startbbr2cake() {
 	remove_bbr_lotserver
 	echo "net.core.default_qdisc=cake" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv4.tcp_congestion_control=bbr2" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}BBR2修改成功，重启生效！"
+	echo -e "${Info}BBR2 修改成功，重启生效！"
 }
 
-#开启ecn
+#开启 ecn
 startecn() {
 	sed -i '/net.ipv4.tcp_ecn/d' /etc/sysctl.d/99-sysctl.conf
 	sed -i '/net.ipv4.tcp_ecn/d' /etc/sysctl.conf
 
 	echo "net.ipv4.tcp_ecn=1" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}开启ecn结束！"
+	echo -e "${Info}开启 ecn 结束！"
 }
 
-#关闭ecn
+#关闭 ecn
 closeecn() {
 	sed -i '/net.ipv4.tcp_ecn/d' /etc/sysctl.d/99-sysctl.conf
 	sed -i '/net.ipv4.tcp_ecn/d' /etc/sysctl.conf
 
 	echo "net.ipv4.tcp_ecn=0" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}关闭ecn结束！"
+	echo -e "${Info}关闭 ecn 结束！"
 }
 
-#编译安装brutal
+#编译安装 brutal
 startbrutal() {
-	# 如果 headers_status 为 "已匹配headers"，执行外部脚本
+	# 如果 headers_status 为 "已匹配 headers"，执行外部脚本
 	if [[ "$headers_status" == "已匹配" ]]; then
 		echo "Headers 已匹配，开始编译..."
 		bash <(curl -fsSL https://tcp.hy2.sh/)
@@ -1150,12 +1150,12 @@ startbrutal() {
 			exit 1 # 失败退出
 		fi
 	else
-		echo "当前内核headers不匹配或者没有安装"
+		echo "当前内核 headers 不匹配或者没有安装"
 		exit 1
 	fi
 }
 
-#卸载bbr+锐速
+#卸载 bbr+锐速
 remove_bbr_lotserver() {
 	sed -i '/net.ipv4.tcp_ecn/d' /etc/sysctl.d/99-sysctl.conf
 	sed -i '/net.core.default_qdisc/d' /etc/sysctl.d/99-sysctl.conf
@@ -1171,7 +1171,7 @@ remove_bbr_lotserver() {
 		echo | bash <(wget -qO- https://raw.githubusercontent.com/fei5seven/lotServer/master/lotServerInstall.sh) uninstall
 	fi
 	clear
-	# echo -e "${Info}:清除bbr/lotserver加速完成。"
+	# echo -e "${Info}:清除 bbr/lotserver 加速完成。"
 	# sleep 1s
 }
 
@@ -1297,21 +1297,21 @@ gototcp() {
 	bash <(wget -qO- https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh)
 }
 
-#切换到秋水逸冰BBR安装脚本
+#切换到秋水逸冰 BBR 安装脚本
 gototeddysun_bbr() {
 	clear
 	bash <(wget -qO- https://github.com/teddysun/across/raw/master/bbr.sh)
 }
 
-#切换到一键DD安装系统脚本 新手勿入
+#切换到一键 DD 安装系统脚本 新手勿入
 gotodd() {
 	clear
-	echo DD使用git.beta.gs的脚本，知悉
+	echo DD 使用 git.beta.gs 的脚本，知悉
 	sleep 1.5
 	bash <(wget -qO- https://github.com/fcurrk/reinstall/raw/master/NewReinstall.sh)
 }
 
-#切换到检查当前IP质量/媒体解锁/邮箱通信脚本
+#切换到检查当前 IP 质量/媒体解锁/邮箱通信脚本
 gotoipcheck() {
 	clear
 	sleep 1.5
@@ -1319,7 +1319,7 @@ gotoipcheck() {
 	#bash <(wget -qO- https://IP.Check.Place)
 }
 
-#禁用IPv6
+#禁用 IPv6
 closeipv6() {
 	clear
 	sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
@@ -1333,10 +1333,10 @@ closeipv6() {
 net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}禁用IPv6结束，可能需要重启！"
+	echo -e "${Info}禁用 IPv6 结束，可能需要重启！"
 }
 
-#开启IPv6
+#开启 IPv6
 openipv6() {
 	clear
 	sed -i '/net.ipv6.conf.all.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf
@@ -1354,37 +1354,37 @@ net.ipv6.conf.lo.disable_ipv6 = 0
 net.ipv6.conf.all.accept_ra = 2
 net.ipv6.conf.default.accept_ra = 2" >>/etc/sysctl.d/99-sysctl.conf
 	sysctl --system
-	echo -e "${Info}开启IPv6结束，可能需要重启！"
+	echo -e "${Info}开启 IPv6 结束，可能需要重启！"
 }
 
 #开始菜单
 start_menu() {
 	clear
-	echo && echo -e " TCP加速 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}] 不卸内核${Font_color_suffix} from blog.ylx.me 母鸡慎用
+	echo && echo -e " TCP 加速 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}] 不卸内核${Font_color_suffix} from blog.ylx.me 母鸡慎用
  ${Green_font_prefix}0.${Font_color_suffix}  升级脚本
- ${Green_font_prefix}9.${Font_color_suffix}  切换到卸载内核版本        ${Green_font_prefix}10.${Font_color_suffix} 切换到一键DD系统脚本
- ${Green_font_prefix}60.${Font_color_suffix} 切换到检查当前IP质量/媒体解锁/邮箱通信脚本
+ ${Green_font_prefix}9.${Font_color_suffix}  切换到卸载内核版本              ${Green_font_prefix}10.${Font_color_suffix} 切换到一键 DD 系统脚本
+ ${Green_font_prefix}60.${Font_color_suffix} 切换到检查当前 IP 质量/媒体解锁/邮箱通信脚本
  ———————————————————————————— 内核安装 —————————————————————————————
- ${Green_font_prefix}1.${Font_color_suffix}  安装 BBR原版内核         ${Green_font_prefix}7.${Font_color_suffix}  安装 Zen官方版内核
- ${Green_font_prefix}2.${Font_color_suffix}  安装 BBRplus版内核       ${Green_font_prefix}5.${Font_color_suffix}  安装 BBRplus新版内核
- ${Green_font_prefix}3.${Font_color_suffix}  安装 Lotserver(锐速)内核 ${Green_font_prefix}8.${Font_color_suffix}  安装 官方cloud内核
- ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核        ${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核
+ ${Green_font_prefix}1.${Font_color_suffix}  安装 BBR 原版内核            ${Green_font_prefix}7.${Font_color_suffix}  安装 Zen 官方版内核
+ ${Green_font_prefix}2.${Font_color_suffix}  安装 BBRplus 版内核         ${Green_font_prefix}5.${Font_color_suffix}  安装 BBRplus 新版内核
+ ${Green_font_prefix}3.${Font_color_suffix}  安装 Lotserver (锐速) 内核   ${Green_font_prefix}8.${Font_color_suffix}  安装 官方 cloud 内核
+ ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核              ${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核
  ${Green_font_prefix}32.${Font_color_suffix} 安装 XANMOD(main)        ${Green_font_prefix}33.${Font_color_suffix} 安装 XANMOD(LTS)
  ${Green_font_prefix}36.${Font_color_suffix} 安装 XANMOD(EDGE)        ${Green_font_prefix}37.${Font_color_suffix} 安装 XANMOD(RT)
  ———————————————————————————— 加速启用 —————————————————————————————
- ${Green_font_prefix}11.${Font_color_suffix} 使用BBR+FQ加速           ${Green_font_prefix}12.${Font_color_suffix} 使用BBR+FQ_PIE加速 
- ${Green_font_prefix}13.${Font_color_suffix} 使用BBR+CAKE加速         ${Green_font_prefix}14.${Font_color_suffix} 使用BBR2+FQ加速
- ${Green_font_prefix}15.${Font_color_suffix} 使用BBR2+FQ_PIE加速      ${Green_font_prefix}16.${Font_color_suffix} 使用BBR2+CAKE加速
- ${Green_font_prefix}19.${Font_color_suffix} 使用BBRplus+FQ版加速     ${Green_font_prefix}20.${Font_color_suffix} 使用Lotserver(锐速)加速
- ${Green_font_prefix}28.${Font_color_suffix} 编译安装brutal模块
+ ${Green_font_prefix}11.${Font_color_suffix} 使用 BBR+FQ 加速           ${Green_font_prefix}12.${Font_color_suffix} 使用 BBR+FQ_PIE 加速 
+ ${Green_font_prefix}13.${Font_color_suffix} 使用 BBR+CAKE 加速         ${Green_font_prefix}14.${Font_color_suffix} 使用 BBR2+FQ 加速
+ ${Green_font_prefix}15.${Font_color_suffix} 使用 BBR2+FQ_PIE 加速      ${Green_font_prefix}16.${Font_color_suffix} 使用 BBR2+CAKE 加速
+ ${Green_font_prefix}19.${Font_color_suffix} 使用 BBRplus+FQ 版加速      ${Green_font_prefix}20.${Font_color_suffix} 使用 Lotserver (锐速) 加速
+ ${Green_font_prefix}28.${Font_color_suffix} 编译安装 brutal 模块
  ———————————————————————————— 系统配置 —————————————————————————————
- ${Green_font_prefix}17.${Font_color_suffix} 开启ECN                  ${Green_font_prefix}18.${Font_color_suffix} 关闭ECN
- ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧           ${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
- ${Green_font_prefix}23.${Font_color_suffix} 禁用IPv6                 ${Green_font_prefix}24.${Font_color_suffix} 开启IPv6
- ${Green_font_prefix}61.${Font_color_suffix} 手动提交合并内核参数     ${Green_font_prefix}62.${Font_color_suffix} 手动编辑内核参数
+ ${Green_font_prefix}17.${Font_color_suffix} 开启 ECN                 ${Green_font_prefix}18.${Font_color_suffix} 关闭 ECN
+ ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧                ${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
+ ${Green_font_prefix}23.${Font_color_suffix} 禁用 IPv6                ${Green_font_prefix}24.${Font_color_suffix} 开启 IPv6
+ ${Green_font_prefix}61.${Font_color_suffix} 手动提交合并内核参数             ${Green_font_prefix}62.${Font_color_suffix} 手动编辑内核参数
  ———————————————————————————— 内核管理 —————————————————————————————
- ${Green_font_prefix}51.${Font_color_suffix} 查看排序内核             ${Green_font_prefix}52.${Font_color_suffix} 删除保留指定内核
- ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速             ${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
+ ${Green_font_prefix}51.${Font_color_suffix} 查看排序内核                 ${Green_font_prefix}52.${Font_color_suffix} 删除保留指定内核
+ ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速                 ${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
 ————————————————————————————————————————————————————————————————" &&
 		check_status
 	get_system_info
@@ -1395,7 +1395,7 @@ start_menu() {
 		echo -e " 状态: ${Green_font_prefix}已安装${Font_color_suffix} ${Red_font_prefix}${kernel_status}${Font_color_suffix} 加速内核 , ${Green_font_prefix}${run_status}${Font_color_suffix} ${Red_font_prefix}${brutal}${Font_color_suffix}"
 
 	fi
-	echo -e " 拥塞控制算法:: ${Green_font_prefix}${net_congestion_control}${Font_color_suffix} 队列算法: ${Green_font_prefix}${net_qdisc}${Font_color_suffix} 内核headers：${Green_font_prefix}${headers_status}${Font_color_suffix}"
+	echo -e " 拥塞控制算法:: ${Green_font_prefix}${net_congestion_control}${Font_color_suffix} 队列算法: ${Green_font_prefix}${net_qdisc}${Font_color_suffix} 内核 headers：${Green_font_prefix}${headers_status}${Font_color_suffix}"
 
 	read -p " 请输入数字 :" num
 	case "$num" in
@@ -1561,10 +1561,10 @@ detele_kernel_head() {
 	if [[ "${OS_type}" == "CentOS" ]]; then
 		rpm_total=$(rpm -qa | grep kernel-headers | grep -v "${kernel_version}" | grep -v "noarch" | wc -l)
 		if [ "${rpm_total}" ] >"1"; then
-			echo -e "检测到 ${rpm_total} 个其余head内核，开始卸载..."
+			echo -e "检测到 ${rpm_total} 个其余 head 内核，开始卸载..."
 			for ((integer = 1; integer <= ${rpm_total}; integer++)); do
 				rpm_del=$(rpm -qa | grep kernel-headers | grep -v "${kernel_version}" | grep -v "noarch" | head -${integer})
-				echo -e "开始卸载 ${rpm_del} headers内核..."
+				echo -e "开始卸载 ${rpm_del} headers 内核..."
 				rpm --nodeps -e "${rpm_del}"
 				echo -e "卸载 ${rpm_del} 内核卸载完成，继续..."
 			done
@@ -1575,10 +1575,10 @@ detele_kernel_head() {
 	elif [[ "${OS_type}" == "Debian" ]]; then
 		deb_total=$(dpkg -l | grep linux-headers | awk '{print $2}' | grep -v "${kernel_version}" | wc -l)
 		if [ "${deb_total}" ] >"1"; then
-			echo -e "检测到 ${deb_total} 个其余head内核，开始卸载..."
+			echo -e "检测到 ${deb_total} 个其余 head 内核，开始卸载..."
 			for ((integer = 1; integer <= ${deb_total}; integer++)); do
 				deb_del=$(dpkg -l | grep linux-headers | awk '{print $2}' | grep -v "${kernel_version}" | head -${integer})
-				echo -e "开始卸载 ${deb_del} headers内核..."
+				echo -e "开始卸载 ${deb_del} headers 内核..."
 				apt-get purge -y "${deb_del}"
 				apt-get autoremove -y
 				echo -e "卸载 ${deb_del} 内核卸载完成，继续..."
@@ -1592,7 +1592,7 @@ detele_kernel_head() {
 
 detele_kernel_custom() {
 	BBR_grub
-	read -p " 查看上面内核输入需保留的内核关键词(如:5.15.0-11) :" kernel_version
+	read -p " 查看上面内核输入需保留的内核关键词 (如:5.15.0-11) :" kernel_version
 	detele_kernel
 	detele_kernel_head
 	BBR_grub
@@ -1604,7 +1604,7 @@ detele_kernel_custom() {
 #       命令执行失败时，将不会回滚文件更改。
 #-----------------------------------------------------------------------
 update_sysctl_interactive() {
-	# 强制使用C语言环境，确保正则表达式的行为可预测且一致。
+	# 强制使用 C 语言环境，确保正则表达式的行为可预测且一致。
 	local LC_ALL=C
 
 	# --- 配置与参数解析 ---
@@ -1636,8 +1636,8 @@ update_sysctl_interactive() {
 
 	# 2. 交互式获取用户输入
 	log_info "请输入或粘贴您要设置的 sysctl 参数 (格式: key = value)。"
-	log_info "可参考TCP迷之调参，https://omnitt.com/"
-	log_info "注释行(以 # 或 ; 开头)和空行将被忽略。"
+	log_info "可参考 TCP 迷之调参，https://omnitt.com/"
+	log_info "注释行(以 # 或 ; 开头) 和空行将被忽略。"
 	log_info "最后一行请以空行结束 可手动回车加一行空行"
 	log_info "输入完成后，请按 Ctrl+D 结束输入。"
 
@@ -1767,7 +1767,7 @@ edit_sysctl_interactive() {
 	# --- 1. 检查文件是否存在 ---
 	if [ ! -f "$target_file" ]; then
 		echo "文件 $target_file 不存在。"
-		# (Y/n) 格式，n/N 以外的任何输入（包括回车）都将继续
+		# (Y/n) 格式，n/N 以外的任何输入（包括回车） 都将继续
 		read -r -p "您想现在创建并编辑它吗？ (Y/n): " create_choice
 
 		case "$create_choice" in
@@ -1778,7 +1778,7 @@ edit_sysctl_interactive() {
 		*)
 			echo "好的，准备创建并打开编辑器..."
 			# 注意：我们不需要在这里 'touch' 文件。
-			# 'sudo' 配合编辑器（如 nano 或 vi）在保存时会自动创建文件。
+			# 'sudo' 配合编辑器 （如 nano 或 vi） 在保存时会自动创建文件。
 			;;
 		esac
 	fi
@@ -1790,7 +1790,7 @@ edit_sysctl_interactive() {
 	else
 		# nano 不存在，提示安装
 		echo "首选编辑器 'nano' 未安装。"
-		# (Y/n) 格式，n/N 以外的任何输入（包括回车）都将继续
+		# (Y/n) 格式，n/N 以外的任何输入（包括回车） 都将继续
 		read -r -p "您想现在安装 'nano' 吗？ (Y/n): " install_choice
 
 		case "$install_choice" in
@@ -1810,7 +1810,7 @@ edit_sysctl_interactive() {
 			echo "  sudo yum install nano  (适用于 CentOS 7)"
 			echo "安装完成后，请重新运行此函数。"
 			echo "操作已取消。"
-			return 1 # 1 表示一个非0的退出码，表示未完成
+			return 1 # 1 表示一个非 0 的退出码，表示未完成
 			;;
 		esac
 	fi
@@ -1902,9 +1902,9 @@ BBR_grub() {
 #简单的检查内核
 check_kernel() {
 	if [[ -z "$(find /boot -type f -name 'vmlinuz-*' ! -name 'vmlinuz-*rescue*')" ]]; then
-		echo -e "\033[0;31m警告: 未发现内核文件，请勿重启系统，不卸载内核版本选择30安装默认内核救急！\033[0m"
+		echo -e "\033[0;31m 警告: 未发现内核文件，请勿重启系统，不卸载内核版本选择 30 安装默认内核救急！\033[0m"
 	else
-		echo -e "\033[0;32m发现内核文件，看起来可以重启。\033[0m"
+		echo -e "\033[0;32m 发现内核文件，看起来可以重启。\033[0m"
 	fi
 }
 
@@ -1926,10 +1926,10 @@ check_sys() {
 
 	if [[ -f /etc/debian_version ]]; then
 		OS_type="Debian"
-		echo "检测为Debian通用系统，判断有误请反馈"
+		echo "检测为 Debian 通用系统，判断有误请反馈"
 	elif [[ -f /etc/redhat-release || -f /etc/centos-release || -f /etc/fedora-release ]]; then
 		OS_type="CentOS"
-		echo "检测为CentOS通用系统，判断有误请反馈"
+		echo "检测为 CentOS 通用系统，判断有误请反馈"
 	else
 		echo "Unknown"
 	fi
@@ -2004,7 +2004,7 @@ check_sys() {
 			elif [ "${Var_VirtType}" = "rkt" ]; then
 				virtual="RKT"
 			# 特殊处理
-			elif [ -c "/dev/lxss" ]; then # 处理WSL虚拟化
+			elif [ -c "/dev/lxss" ]; then # 处理 WSL 虚拟化
 				Var_VirtType="wsl"
 				virtual="Windows Subsystem for Linux (WSL)"
 			# 未匹配到任何结果, 或者非虚拟机
@@ -2024,10 +2024,10 @@ check_sys() {
 		elif [ ! -f "/usr/sbin/virt-what" ]; then
 			Var_VirtType="Unknown"
 			virtual="[Error: virt-what not found !]"
-		elif [ -f "/.dockerenv" ]; then # 处理Docker虚拟化
+		elif [ -f "/.dockerenv" ]; then # 处理 Docker 虚拟化
 			Var_VirtType="docker"
 			virtual="Docker"
-		elif [ -c "/dev/lxss" ]; then # 处理WSL虚拟化
+		elif [ -c "/dev/lxss" ]; then # 处理 WSL 虚拟化
 			Var_VirtType="wsl"
 			virtual="Windows Subsystem for Linux (WSL)"
 		else # 正常判断流程
@@ -2061,7 +2061,7 @@ check_sys() {
 			yum install ca-certificates -y
 			update-ca-trust force-enable
 		fi
-		echo 'CA证书检查OK'
+		echo 'CA 证书检查 OK'
 
 		# 检查并安装 curl、wget、dmidecode 和 redhat-lsb-core 包
 		for pkg in curl wget dmidecode redhat-lsb-core; do
@@ -2100,7 +2100,7 @@ check_sys() {
 			apt-get update || apt-get --allow-releaseinfo-change update && apt-get install ca-certificates -y
 			update-ca-certificates
 		fi
-		echo 'CA证书检查OK'
+		echo 'CA 证书检查 OK'
 
 		# 检查并安装 curl、wget 和 dmidecode 包
 		for pkg in curl wget dmidecode; do
@@ -2125,7 +2125,7 @@ check_sys() {
 	fi
 }
 
-#检查Linux版本
+#检查 Linux 版本
 check_version() {
 	if [[ -s /etc/redhat-release ]]; then
 		version=$(grep -oE "[0-9.]+" /etc/redhat-release | cut -d . -f 1)
@@ -2136,20 +2136,20 @@ check_version() {
 	#check_github
 }
 
-#检查安装bbr的系统要求
+#检查安装 bbr 的系统要求
 check_sys_bbr() {
 	check_version
 	if [[ "${OS_type}" == "CentOS" ]]; then
 		if [[ ${version} == "7" ]]; then
 			installbbr
 		else
-			echo -e "${Error} BBR内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+			echo -e "${Error} BBR 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 		fi
 	elif [[ "${OS_type}" == "Debian" ]]; then
 		apt-get --fix-broken install -y && apt-get autoremove -y
 		installbbr
 	else
-		echo -e "${Error} BBR内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+		echo -e "${Error} BBR 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 	fi
 }
 
@@ -2159,13 +2159,13 @@ check_sys_bbrplus() {
 		if [[ ${version} == "7" ]]; then
 			installbbrplus
 		else
-			echo -e "${Error} BBRplus内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+			echo -e "${Error} BBRplus 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 		fi
 	elif [[ "${OS_type}" == "Debian" ]]; then
 		apt-get --fix-broken install -y && apt-get autoremove -y
 		installbbrplus
 	else
-		echo -e "${Error} BBRplus内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+		echo -e "${Error} BBRplus 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 	fi
 }
 
@@ -2176,13 +2176,13 @@ check_sys_bbrplusnew() {
 		if [[ ${version} == "7" || ${version} == "8" ]]; then
 			installbbrplusnew
 		else
-			echo -e "${Error} BBRplusNew内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+			echo -e "${Error} BBRplusNew 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 		fi
 	elif [[ "${OS_type}" == "Debian" ]]; then
 		apt-get --fix-broken install -y && apt-get autoremove -y
 		installbbrplusnew
 	else
-		echo -e "${Error} BBRplusNew内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+		echo -e "${Error} BBRplusNew 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 	fi
 }
 
@@ -2192,13 +2192,13 @@ check_sys_xanmod() {
 		if [[ ${version} == "7" || ${version} == "8" ]]; then
 			installxanmod
 		else
-			echo -e "${Error} xanmod内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+			echo -e "${Error} xanmod 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 		fi
 	elif [[ "${OS_type}" == "Debian" ]]; then
 		apt-get --fix-broken install -y && apt-get autoremove -y
 		installxanmod
 	else
-		echo -e "${Error} xanmod内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+		echo -e "${Error} xanmod 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 	fi
 }
 
@@ -2208,16 +2208,16 @@ check_sys_cloud() {
 		apt-get --fix-broken install -y && apt-get autoremove -y
 		installcloud
 	else
-		echo -e "${Error} cloud内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+		echo -e "${Error} cloud 内核不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 	fi
 }
 
-#检查安装Lotsever的系统要求
+#检查安装 Lotsever 的系统要求
 check_sys_Lotsever() {
 	check_version
 	bit=$(uname -m)
 	if [[ ${bit} != "x86_64" ]]; then
-		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+		echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	fi
 	if [[ "${OS_type}" == "CentOS" ]]; then
 		if [[ ${version} == "6" ]]; then
@@ -2228,7 +2228,7 @@ check_sys_Lotsever() {
 			kernel_version="4.11.2-1"
 			installlot
 		else
-			echo -e "${Error} Lotsever不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+			echo -e "${Error} Lotsever 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 		fi
 	elif [[ "${release}" == "debian" ]]; then
 		if [[ ${version} == "7" || ${version} == "8" ]]; then
@@ -2245,7 +2245,7 @@ check_sys_Lotsever() {
 				installlot
 			fi
 		else
-			echo -e "${Error} Lotsever不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+			echo -e "${Error} Lotsever 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 		fi
 	elif [[ "${release}" == "ubuntu" ]]; then
 		if [[ ${version} -ge "12" ]]; then
@@ -2257,10 +2257,10 @@ check_sys_Lotsever() {
 				installlot
 			fi
 		else
-			echo -e "${Error} Lotsever不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+			echo -e "${Error} Lotsever 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 		fi
 	else
-		echo -e "${Error} Lotsever不支持当前系统 ${release} ${version} ${bit} !" && exit 1
+		echo -e "${Error} Lotsever 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 	fi
 }
 
@@ -2270,7 +2270,7 @@ check_sys_official() {
 	bit=$(uname -m)
 	if [[ "${OS_type}" == "CentOS" ]]; then
 		if [[ ${bit} != "x86_64" ]]; then
-			echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+			echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 		fi
 		if [[ ${version} == "7" ]]; then
 			yum install kernel kernel-headers -y --skip-broken
@@ -2378,7 +2378,7 @@ check_sys_official_bbr() {
 	bit=$(uname -m)
 	if [[ "${OS_type}" == "CentOS" ]]; then
 		if [[ ${bit} != "x86_64" ]]; then
-			echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+			echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 		fi
 		rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
 		if [[ ${version} == "7" ]]; then
@@ -2427,7 +2427,7 @@ check_sys_official_bbr() {
 			echo -e "[Error] 不支持当前系统架构 ${os_arch} !" && exit 1
 		fi
 	elif [[ "${release}" == "ubuntu" ]]; then
-		echo -e "${Error} ubuntu不会写，你来吧" && exit 1
+		echo -e "${Error} ubuntu 不会写，你来吧" && exit 1
 	else
 		echo -e "${Error} 不支持当前系统 ${release} ${version} ${bit} !" && exit 1
 	fi
@@ -2436,7 +2436,7 @@ check_sys_official_bbr() {
 	echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
-#检查官方xanmod main内核并安装
+#检查官方 xanmod main 内核并安装
 check_sys_official_xanmod_main() {
 	check_version
 	wget -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
@@ -2445,7 +2445,7 @@ check_sys_official_xanmod_main() {
 	echo -e "CPU supports \033[32m${cpu_level}\033[0m"
 	# exit
 	if [[ ${bit} != "x86_64" ]]; then
-		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+		echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	fi
 
 	if [[ "${OS_type}" == "Debian" ]]; then
@@ -2471,7 +2471,7 @@ check_sys_official_xanmod_main() {
 	echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
-#检查官方xanmod lts内核并安装
+#检查官方 xanmod lts 内核并安装
 check_sys_official_xanmod_lts() {
 	check_version
 	wget -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
@@ -2480,7 +2480,7 @@ check_sys_official_xanmod_lts() {
 	echo -e "CPU supports \033[32m${cpu_level}\033[0m"
 	# exit
 	if [[ ${bit} != "x86_64" ]]; then
-		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+		echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	fi
 
 	if [[ "${OS_type}" == "Debian" ]]; then
@@ -2506,7 +2506,7 @@ check_sys_official_xanmod_lts() {
 	echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
-#检查官方xanmod edge内核并安装
+#检查官方 xanmod edge 内核并安装
 check_sys_official_xanmod_edge() {
 	check_version
 	wget -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
@@ -2515,7 +2515,7 @@ check_sys_official_xanmod_edge() {
 	echo -e "CPU supports \033[32m${cpu_level}\033[0m"
 	# exit
 	if [[ ${bit} != "x86_64" ]]; then
-		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+		echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	fi
 
 	if [[ "${OS_type}" == "Debian" ]]; then
@@ -2541,7 +2541,7 @@ check_sys_official_xanmod_edge() {
 	echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
-#检查官方xanmod rt内核并安装
+#检查官方 xanmod rt 内核并安装
 check_sys_official_xanmod_rt() {
 	check_version
 	wget -O check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh
@@ -2550,7 +2550,7 @@ check_sys_official_xanmod_rt() {
 	echo -e "CPU supports \033[32m${cpu_level}\033[0m"
 	# exit
 	if [[ ${bit} != "x86_64" ]]; then
-		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+		echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	fi
 
 	if [[ "${OS_type}" == "Debian" ]]; then
@@ -2576,11 +2576,11 @@ check_sys_official_xanmod_rt() {
 	echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
-#检查Zen官方内核并安装
+#检查 Zen 官方内核并安装
 check_sys_official_zen() {
 	check_version
 	if [[ ${bit} != "x86_64" ]]; then
-		echo -e "${Error} 不支持x86_64以外的系统 !" && exit 1
+		echo -e "${Error} 不支持 x86_64 以外的系统 !" && exit 1
 	fi
 	if [[ "${release}" == "debian" ]]; then
 		curl 'https://liquorix.net/add-liquorix-repo.sh' | sudo bash
@@ -2635,23 +2635,23 @@ check_status() {
 	if [[ "$kernel_status" == "BBR" ]]; then
 		case "$net_congestion_control" in
 		"bbr")
-			run_status="BBR启动成功"
+			run_status="BBR 启动成功"
 			;;
 		"bbr2")
-			run_status="BBR2启动成功"
+			run_status="BBR2 启动成功"
 			;;
 		"tsunami")
 			if lsmod | grep -q "^tcp_tsunami"; then
-				run_status="BBR魔改版启动成功"
+				run_status="BBR 魔改版启动成功"
 			else
-				run_status="BBR魔改版启动失败"
+				run_status="BBR 魔改版启动失败"
 			fi
 			;;
 		"nanqinlang")
 			if lsmod | grep -q "^tcp_nanqinlang"; then
-				run_status="暴力BBR魔改版启动成功"
+				run_status="暴力 BBR 魔改版启动成功"
 			else
-				run_status="暴力BBR魔改版启动失败"
+				run_status="暴力 BBR 魔改版启动失败"
 			fi
 			;;
 		*)
@@ -2668,10 +2668,10 @@ check_status() {
 	elif [[ "$kernel_status" == "BBRplus" ]]; then
 		case "$net_congestion_control" in
 		"bbrplus")
-			run_status="BBRplus启动成功"
+			run_status="BBRplus 启动成功"
 			;;
 		"bbr")
-			run_status="BBR启动成功"
+			run_status="BBR 启动成功"
 			;;
 		*)
 			run_status="未安装加速模块"
@@ -2681,7 +2681,7 @@ check_status() {
 		run_status="未安装加速模块"
 	fi
 
-	# 检查 kernel-headers 或 kernel-devel（CentOS）/linux-headers（Debian/Ubuntu）状态
+	# 检查 kernel-headers 或 kernel-devel（CentOS）/linux-headers（Debian/Ubuntu） 状态
 	if [[ "$os_type" == "centos" ]]; then
 		installed_headers=$(rpm -qa | grep -E "kernel-devel|kernel-headers" | grep -v '^$' || echo "")
 		if [[ -z "$installed_headers" ]]; then
@@ -2711,7 +2711,7 @@ check_status() {
 	# Brutal 状态检测
 	brutal=""
 	if lsmod | grep -q "brutal"; then
-		brutal="brutal已加载"
+		brutal="brutal 已加载"
 	fi
 }
 
