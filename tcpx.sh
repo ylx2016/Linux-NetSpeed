@@ -1362,29 +1362,29 @@ start_menu() {
 	clear
 	echo && echo -e " TCP 加速 一键安装管理脚本 ${Red_font_prefix}[v${sh_ver}] 不卸内核${Font_color_suffix} from blog.ylx.me 母鸡慎用
  ${Green_font_prefix}0.${Font_color_suffix}  升级脚本
- ${Green_font_prefix}9.${Font_color_suffix}  切换到卸载内核版本              ${Green_font_prefix}10.${Font_color_suffix} 切换到一键 DD 系统脚本
+ ${Green_font_prefix}9.${Font_color_suffix}  切换到卸载内核版本         ${Green_font_prefix}10.${Font_color_suffix} 切换到一键 DD 系统脚本
  ${Green_font_prefix}60.${Font_color_suffix} 切换到检查当前 IP 质量/媒体解锁/邮箱通信脚本
  ———————————————————————————— 内核安装 —————————————————————————————
- ${Green_font_prefix}1.${Font_color_suffix}  安装 BBR 原版内核            ${Green_font_prefix}7.${Font_color_suffix}  安装 Zen 官方版内核
- ${Green_font_prefix}2.${Font_color_suffix}  安装 BBRplus 版内核         ${Green_font_prefix}5.${Font_color_suffix}  安装 BBRplus 新版内核
- ${Green_font_prefix}3.${Font_color_suffix}  安装 Lotserver (锐速) 内核   ${Green_font_prefix}8.${Font_color_suffix}  安装 官方 cloud 内核
- ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核              ${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核
- ${Green_font_prefix}32.${Font_color_suffix} 安装 XANMOD(main)        ${Green_font_prefix}33.${Font_color_suffix} 安装 XANMOD(LTS)
- ${Green_font_prefix}36.${Font_color_suffix} 安装 XANMOD(EDGE)        ${Green_font_prefix}37.${Font_color_suffix} 安装 XANMOD(RT)
+ ${Green_font_prefix}1.${Font_color_suffix}  安装 BBR 原版内核          ${Green_font_prefix}7.${Font_color_suffix}  安装 Zen 官方版内核
+ ${Green_font_prefix}2.${Font_color_suffix}  安装 BBRplus 版内核        ${Green_font_prefix}5.${Font_color_suffix}  安装 BBRplus 新版内核
+ ${Green_font_prefix}3.${Font_color_suffix}  安装 Lotserver (锐速) 内核 ${Green_font_prefix}8.${Font_color_suffix}  安装 官方 cloud 内核
+ ${Green_font_prefix}30.${Font_color_suffix} 安装 官方稳定内核          ${Green_font_prefix}31.${Font_color_suffix} 安装 官方最新内核
+ ${Green_font_prefix}32.${Font_color_suffix} 安装 XANMOD(main)          ${Green_font_prefix}33.${Font_color_suffix} 安装 XANMOD(LTS)
+ ${Green_font_prefix}36.${Font_color_suffix} 安装 XANMOD(EDGE)          ${Green_font_prefix}37.${Font_color_suffix} 安装 XANMOD(RT)
  ———————————————————————————— 加速启用 —————————————————————————————
  ${Green_font_prefix}11.${Font_color_suffix} 使用 BBR+FQ 加速           ${Green_font_prefix}12.${Font_color_suffix} 使用 BBR+FQ_PIE 加速 
  ${Green_font_prefix}13.${Font_color_suffix} 使用 BBR+CAKE 加速         ${Green_font_prefix}14.${Font_color_suffix} 使用 BBR2+FQ 加速
  ${Green_font_prefix}15.${Font_color_suffix} 使用 BBR2+FQ_PIE 加速      ${Green_font_prefix}16.${Font_color_suffix} 使用 BBR2+CAKE 加速
- ${Green_font_prefix}19.${Font_color_suffix} 使用 BBRplus+FQ 版加速      ${Green_font_prefix}20.${Font_color_suffix} 使用 Lotserver (锐速) 加速
+ ${Green_font_prefix}19.${Font_color_suffix} 使用 BBRplus+FQ 版加速     ${Green_font_prefix}20.${Font_color_suffix} 使用 Lotserver (锐速) 加速
  ${Green_font_prefix}28.${Font_color_suffix} 编译安装 brutal 模块
  ———————————————————————————— 系统配置 —————————————————————————————
- ${Green_font_prefix}17.${Font_color_suffix} 开启 ECN                 ${Green_font_prefix}18.${Font_color_suffix} 关闭 ECN
- ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧                ${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
- ${Green_font_prefix}23.${Font_color_suffix} 禁用 IPv6                ${Green_font_prefix}24.${Font_color_suffix} 开启 IPv6
- ${Green_font_prefix}61.${Font_color_suffix} 手动提交合并内核参数             ${Green_font_prefix}62.${Font_color_suffix} 手动编辑内核参数
+ ${Green_font_prefix}17.${Font_color_suffix} 开启 ECN                   ${Green_font_prefix}18.${Font_color_suffix} 关闭 ECN
+ ${Green_font_prefix}21.${Font_color_suffix} 系统配置优化旧             ${Green_font_prefix}22.${Font_color_suffix} 系统配置优化新
+ ${Green_font_prefix}23.${Font_color_suffix} 禁用 IPv6                  ${Green_font_prefix}24.${Font_color_suffix} 开启 IPv6
+ ${Green_font_prefix}61.${Font_color_suffix} 手动提交合并内核参数       ${Green_font_prefix}62.${Font_color_suffix} 手动编辑内核参数
  ———————————————————————————— 内核管理 —————————————————————————————
- ${Green_font_prefix}51.${Font_color_suffix} 查看排序内核                 ${Green_font_prefix}52.${Font_color_suffix} 删除保留指定内核
- ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速                 ${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
+ ${Green_font_prefix}51.${Font_color_suffix} 查看排序内核               ${Green_font_prefix}52.${Font_color_suffix} 删除保留指定内核
+ ${Green_font_prefix}25.${Font_color_suffix} 卸载全部加速               ${Green_font_prefix}99.${Font_color_suffix} 退出脚本 
 ————————————————————————————————————————————————————————————————" &&
 		check_status
 	get_system_info
