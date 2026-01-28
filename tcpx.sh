@@ -1592,7 +1592,30 @@ detele_kernel_head() {
 
 detele_kernel_custom() {
 	BBR_grub
-	read -p " 查看上面内核，输入需保留的内核关键词 (如：5.15.0-11) :" kernel_version
+	local kernel_candidates latest_kernel input
+	kernel_candidates=$(find /boot -maxdepth 1 -type f -name 'vmlinuz-*' ! -name 'vmlinuz-*rescue*' -printf '%f\n' 2>/dev/null | sed 's/^vmlinuz-//' | sort -Vu)
+	if [[ -n "$kernel_candidates" ]]; then
+		latest_kernel=$(echo "$kernel_candidates" | tail -n 1)
+		echo -e "检测到内核版本：\n${kernel_candidates}"
+		echo -e "当前最新内核：${latest_kernel}"
+	else
+		latest_kernel="$(uname -r 2>/dev/null)"
+		if [[ -n "$latest_kernel" ]]; then
+			echo -e "未检测到 /boot 内核列表，使用当前运行内核：${latest_kernel}"
+		fi
+	fi
+
+	if [[ -n "$latest_kernel" ]]; then
+		read -r -p " 查看上面内核，输入需保留的内核关键词 (如：5.15.0-11，直接回车默认：${latest_kernel}) :" input
+		if [[ -z "$input" ]]; then
+			kernel_version="$latest_kernel"
+			echo -e "未输入关键词，默认保留内核关键词：${kernel_version}"
+		else
+			kernel_version="$input"
+		fi
+	else
+		read -r -p " 查看上面内核，输入需保留的内核关键词 (如：5.15.0-11) :" kernel_version
+	fi
 	detele_kernel
 	detele_kernel_head
 	BBR_grub
