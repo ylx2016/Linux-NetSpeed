@@ -2347,6 +2347,7 @@ ensure_xanmod_repo() {
 	local prefer_format=""
 	local had_both=0
 
+	# 可选环境变量：XANMOD_REPO_FORMAT=sources|list（默认自动判断）
 	if [[ -f "${list_file}" && -f "${sources_file}" ]]; then
 		had_both=1
 	fi
