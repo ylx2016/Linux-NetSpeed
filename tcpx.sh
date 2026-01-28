@@ -2297,6 +2297,78 @@ check_sys_official() {
 	echo -e "${Tip} 内核安装完毕，请参考上面的信息检查是否安装成功,默认从排第一的高版本内核启动"
 }
 
+# apt 的 deb822 (.sources) 支持检测，用于决定仓库文件格式
+apt_supports_deb822() {
+	if ! command -v apt-get >/dev/null 2>&1; then
+		return 1
+	fi
+	local ver major minor
+	ver=$(apt-get --version 2>/dev/null | head -n 1 | awk '{print $2}')
+	major=${ver%%.*}
+	minor=${ver#*.}
+	minor=${minor%%.*}
+	if [[ ! "$major" =~ ^[0-9]+$ || ! "$minor" =~ ^[0-9]+$ ]]; then
+		return 1
+	fi
+	if [[ "$major" -gt 1 || ( "$major" -eq 1 && "$minor" -ge 1 ) ]]; then
+		return 0
+	fi
+	return 1
+}
+
+# 统一处理 XanMod 仓库文件，避免 .list 和 .sources 重复
+ensure_xanmod_repo() {
+	local list_file="/etc/apt/sources.list.d/xanmod-kernel.list"
+	local sources_file="/etc/apt/sources.list.d/xanmod-kernel.sources"
+	local repo_line="deb http://deb.xanmod.org releases main"
+	local prefer_format=""
+	local had_both=0
+
+	if [[ -f "${list_file}" && -f "${sources_file}" ]]; then
+		had_both=1
+	fi
+
+	case "${XANMOD_REPO_FORMAT}" in
+	sources|list)
+		prefer_format="${XANMOD_REPO_FORMAT}"
+		;;
+	esac
+
+	if [[ -z "${prefer_format}" ]]; then
+		if [[ -f "${sources_file}" ]]; then
+			prefer_format="sources"
+		elif [[ -f "${list_file}" ]]; then
+			prefer_format="list"
+		else
+			if apt_supports_deb822; then
+				prefer_format="sources"
+			else
+				prefer_format="list"
+			fi
+		fi
+	fi
+
+	if [[ "${prefer_format}" == "sources" ]]; then
+		cat >"${sources_file}" <<EOF
+Types: deb
+URIs: http://deb.xanmod.org
+Suites: releases
+Components: main
+Signed-By: /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
+EOF
+		[[ -f "${list_file}" ]] && rm -f "${list_file}"
+		[[ "${had_both}" -eq 1 ]] && echo -e "${Tip} 已清理重复的 XanMod 源，保留 .sources 格式。"
+	else
+		echo "${repo_line}" >"${list_file}"
+		[[ -f "${sources_file}" ]] && rm -f "${sources_file}"
+		[[ "${had_both}" -eq 1 ]] && echo -e "${Tip} 已清理重复的 XanMod 源，保留 .list 格式。"
+	fi
+
+	if [[ -f /etc/apt/sources.list ]] && grep -q "deb.xanmod.org" /etc/apt/sources.list; then
+		echo -e "${Tip} /etc/apt/sources.list 中已存在 XanMod 源，可能导致重复，请检查。"
+	fi
+}
+
 #检查官方最新内核并安装
 check_sys_official_bbr() {
 	check_version
@@ -2379,9 +2451,9 @@ check_sys_official_xanmod_main() {
 	if [[ "${OS_type}" == "Debian" ]]; then
 		apt update
 		apt-get install gnupg gnupg2 gnupg1 sudo -y
-		echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
 		# --[ 已修改 ]-- 使用 gpg --dearmor 替换 apt-key
 		wget -qO - https://dl.xanmod.org/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
+		ensure_xanmod_repo
 		if [[ "${cpu_level}" == "4" ]]; then
 			apt update && apt install linux-xanmod-x64v3 -y
 		elif [[ "${cpu_level}" == "3" ]]; then
@@ -2414,9 +2486,9 @@ check_sys_official_xanmod_lts() {
 	if [[ "${OS_type}" == "Debian" ]]; then
 		apt update
 		apt-get install gnupg gnupg2 gnupg1 sudo -y
-		echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
 		# --[ 已修改 ]-- 使用 gpg --dearmor 替换 apt-key
 		wget -qO - https://dl.xanmod.org/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
+		ensure_xanmod_repo
 		if [[ "${cpu_level}" == "4" ]]; then
 			apt update && apt install linux-xanmod-lts-x64v3 -y
 		elif [[ "${cpu_level}" == "3" ]]; then
@@ -2449,9 +2521,9 @@ check_sys_official_xanmod_edge() {
 	if [[ "${OS_type}" == "Debian" ]]; then
 		apt update
 		apt-get install gnupg gnupg2 gnupg1 sudo -y
-		echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
 		# --[ 已修改 ]-- 使用 gpg --dearmor 替换 apt-key
 		wget -qO - https://dl.xanmod.org/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
+		ensure_xanmod_repo
 		if [[ "${cpu_level}" == "4" ]]; then
 			apt update && apt install linux-xanmod-edge-x64v3 -y
 		elif [[ "${cpu_level}" == "3" ]]; then
@@ -2484,9 +2556,9 @@ check_sys_official_xanmod_rt() {
 	if [[ "${OS_type}" == "Debian" ]]; then
 		apt update
 		apt-get install gnupg gnupg2 gnupg1 sudo -y
-		echo 'deb http://deb.xanmod.org releases main' | sudo tee /etc/apt/sources.list.d/xanmod-kernel.list
 		# --[ 已修改 ]-- 使用 gpg --dearmor 替换 apt-key
 		wget -qO - https://dl.xanmod.org/gpg.key | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/xanmod-kernel.gpg
+		ensure_xanmod_repo
 		if [[ "${cpu_level}" == "4" ]]; then
 			apt update && apt install linux-xanmod-rt-x64v3 -y
 		elif [[ "${cpu_level}" == "3" ]]; then
