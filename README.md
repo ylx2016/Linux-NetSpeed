@@ -99,7 +99,7 @@ ylx2016 与 chiakge、cx9208 无任何关系。
 - 腾讯 tlinux：<https://mirrors.tencent.com/tlinux/2.4/tlinux/x86_64/RPMS/>
 
 **系统重装（DD）脚本**
-- <https://git.beta.gs/>
+- <[https://git.beta.gs/](https://github.com/bin456789/reinstall/)>
 - <https://www.cxthhhhh.com/network-reinstall-system-modify>
 
 **系统服务周期**
