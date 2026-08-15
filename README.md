@@ -1,150 +1,123 @@
-赞助
-<br>
-支付宝
-<br>
-![20200312144201.png](https://vip1.loli.io/2020/03/12/7IJvKaTcrLBDbtz.png)
+# Linux-NetSpeed（BBR / 锐速 一键脚本）
 
-[搬瓦工在线库存查询](https://bwg.ylx.me/)
+一键管理 Linux 下的 TCP 加速方案：BBR、BBRplus、魔改 BBR、锐速（LotServer）、XanMod / Zen 等内核，以及系统网络参数优化。
 
+## 快速开始
 
-不卸载内核版本
+不卸载现有内核，直接运行菜单：
 
-```
+```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master/tcpx.sh)
 ```
 
-提示：设置BBR和优化已经分开，需要各走一遍。即20和32都需要运行一遍，不分先后。
+安装后可直接输入 `tcpx` 再次调起菜单。
 
-关联action自动编译内核
+### 使用提示
 
-[https://github.com/ylx2016/kernel/](https://github.com/ylx2016/kernel/)
+- **加速算法与系统优化已拆分，需要各跑一遍**：菜单 `20`（设置 BBR 等算法）和 `32`（系统优化）都要运行，不分先后。
+- 支持带参数直接调用（不检测系统）：
+  - `./tcpx.sh op1` → 对应菜单 `32`（系统优化）
+  - `./tcpx.sh op3` → 对应菜单 `38`
+- 关联 GitHub Actions 自动编译内核：<https://github.com/ylx2016/kernel/>
 
-尝试加入参数直接调用优化 ./tcpx.sh op1(对应32) (不会判断系统) op3(对应38)
+### IP 质量检测
 
-ip质检
-```
+```bash
 bash <(curl -Ls IP.Check.Place)
 ```
 
-双持bbr+锐速
-<br>
-bbr 添加
-```
+## BBR + 锐速 双开
+
+先添加 BBR：
+
+```bash
 echo "net.core.default_qdisc=fq" >> /etc/sysctl.d/99-sysctl.conf
-```
-```
 echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.d/99-sysctl.conf
-```
-```
 sysctl -p
 ```
-编辑锐速文件
-```
+
+再编辑锐速配置：
+
+```bash
 nano /appex/etc/config
 ```
-检测代码有BUG，如果锐速正常 运行查看
-```
+
+查看锐速运行状态（内置检测偶有误报，可用下面命令手动确认）：
+
+```bash
 bash /appex/bin/lotServer.sh status | grep "LotServer"
 ```
-检查bbr 内核默认bbr算法不会有输出
-```
+
+## 常用查看命令
+
+```bash
+# 检查 BBR（内核默认 bbr 算法时 lsmod 可能无输出，属正常）
 lsmod | grep bbr
-```
-检查centos安装内核
-```
-grubby --info=ALL|awk -F= '$1=="kernel" {print i++ " : " $2}'
-```
-查看当前支持TCP算法
-```
+
+# CentOS 查看已安装内核
+grubby --info=ALL | awk -F= '$1=="kernel" {print i++ " : " $2}'
+
+# 当前系统支持的 TCP 算法
 cat /proc/sys/net/ipv4/tcp_allowed_congestion_control
-```
-查看当前运行的算法
-```
+
+# 当前生效的拥塞控制算法
 cat /proc/sys/net/ipv4/tcp_congestion_control
-```
-查看当前队列算法
-```
+
+# 当前队列算法（qdisc）
 sysctl net.core.default_qdisc
+
+# 真实队列查看（更改队列算法可能需重启生效）
+tc -s qdisc show
+
+# 内核版本与系统信息
+uname -a
+cat /proc/version
+
+# 重新加载 sysctl 配置（主配置：/etc/sysctl.d/99-sysctl.conf）
+sysctl --system
 ```
-命令： `uname -a`
-<br>
-作用： 查看系统内核版本号及系统名称
 
-命令： `cat /proc/version`
-<br>
-作用： 查看目录"/proc"下version的信息，也可以得到当前系统的内核版本号及系统名称
+## 声明
 
-真实队列查看？ 更改队列算法可能需要重启生效
-<br>
-`tc -s qdisc show`
+ylx2016 与 chiakge、cx9208 无任何关系。
 
-`/etc/sysctl.d/99-sysctl.conf`
-<br>
-`sysctl --system`
+## 参考与内核来源
 
-ylx2016与chiakge、cx9208无任何关系
-<br>
-bbsplus算法原作者
-<br>
-https://blog.csdn.net/dog250/article/details/80629551
-<br>
-bbrplus首用名 ？
-<br>
-https://github.com/cx9208/bbrplus
-<br>
-新版bbrplus
-<br>
-https://github.com/UJX6N/bbrplus-5.10
-<br>
-xanmod官网
-<br>
-https://xanmod.org
-<br>
-Zen官网
-<br>
-https://liquorix.net/
-<br>
-锐速
-<br>
-https://moeclub.org/2017/03/09/14/
-<br>
-其他内核
-<br>
-https://github.com/alibaba/cloud-kernel
-<br>
-https://github.com/Tencent/TencentOS-kernel
-<br>
-官方编译好的内核
-<br>
-https://sourceforge.net/projects/xanmod/files/releases/current
-<br>
-https://elrepo.org/linux/kernel/el7/x86_64/RPMS/
-<br>
-https://elrepo.org/linux/kernel/el8/x86_64/RPMS/
-<br>
-https://kernel.ubuntu.com/~kernel-ppa/mainline/
-<br>
-http://mirrors.aliyun.com/alinux/2.1903/plus/x86_64/Packages/
-<br>
-https://mirrors.tencent.com/tlinux/2.4/tlinux/x86_64/RPMS/
-<br>
-https://bintray.com/multipath-tcp/mptcp_rpm/mptcp/v0.95.1#files
-<br>
-https://bintray.com/multipath-tcp/mptcp_deb/mptcp/v0.95.1#files
+**BBRplus / 魔改算法**
+- 原作者文章：<https://blog.csdn.net/dog250/article/details/80629551>
+- bbrplus 首用：<https://github.com/cx9208/bbrplus>
+- 新版 bbrplus：<https://github.com/UJX6N/bbrplus-5.10>
 
-DD脚本
-<br>
-https://git.beta.gs/
-<br>
-https://www.cxthhhhh.com/network-reinstall-system-modify
+**内核发行版**
+- XanMod 官网：<https://xanmod.org>
+- Zen / Liquorix：<https://liquorix.net/>
+- 锐速说明：<https://moeclub.org/2017/03/09/14/>
+- 阿里 Cloud Kernel：<https://github.com/alibaba/cloud-kernel>
+- TencentOS Kernel：<https://github.com/Tencent/TencentOS-kernel>
 
+**预编译内核下载**
+- XanMod：<https://sourceforge.net/projects/xanmod/files/releases/current>
+- ELRepo el7：<https://elrepo.org/linux/kernel/el7/x86_64/RPMS/>
+- ELRepo el8：<https://elrepo.org/linux/kernel/el8/x86_64/RPMS/>
+- Ubuntu mainline：<https://kernel.ubuntu.com/~kernel-ppa/mainline/>
+- 阿里云 alinux：<http://mirrors.aliyun.com/alinux/2.1903/plus/x86_64/Packages/>
+- 腾讯 tlinux：<https://mirrors.tencent.com/tlinux/2.4/tlinux/x86_64/RPMS/>
 
-服务周期
-<br>
-https://zh.wikipedia.org/zh/Ubuntu
-<br>
-https://wiki.ubuntu.com/Releases
-<br>
-https://wiki.debian.org/LTS
-<br>
-https://wiki.centos.org/zh/About/Product
+**系统重装（DD）脚本**
+- <https://git.beta.gs/>
+- <https://www.cxthhhhh.com/network-reinstall-system-modify>
+
+**系统服务周期**
+- Ubuntu：<https://wiki.ubuntu.com/Releases> · <https://zh.wikipedia.org/zh/Ubuntu>
+- Debian LTS：<https://wiki.debian.org/LTS>
+- CentOS：<https://wiki.centos.org/zh/About/Product>
+
+## 赞助
+
+如果这个项目对你有帮助，可以请作者喝杯咖啡 ☕
+
+**支付宝**
+
+![支付宝赞助](https://vip1.loli.io/2020/03/12/7IJvKaTcrLBDbtz.png)
+
+相关工具：[搬瓦工在线库存查询](https://bwg.ylx.me/)
