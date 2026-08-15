@@ -709,38 +709,18 @@ detect_cloud_max() {
 # 由 signed image 包名推导配套的 headers 下载地址
 # 例: linux-image-6.1.0-18-cloud-amd64_6.1.76-1_amd64.deb
 #     -> linux-headers-6.1.0-18-cloud-amd64_6.1.76-1_amd64.deb (位于 pool/main/l/linux/)
-# Headers 缺失会导致后续 brutal / LotSpeed 模块无法编译，故尽量一并安装。
-get_cloud_headers_url() {
-	local img_file="$1"
-	local debarch="$2"
-	local hdr_base="https://deb.debian.org/debian/pool/main/l/linux/"
-
-	# 提取 ABI 版本 (如 6.1.0-18-cloud-amd64)
-	local abi=$(echo "$img_file" | sed -nE "s/^linux-image-(.*-cloud-${debarch})_.*/\1/p")
-	[[ -z "$abi" ]] && return 0
-
-	# 从 pool 目录列表中查找完全匹配该 ABI 的 headers 包
-	local hdr_pattern="linux-headers-${abi}_[^\" ]+_${debarch}\.deb"
-	local hdr_file=$(curl -sL --max-time 10 "$hdr_base" | grep -oE "$hdr_pattern" | sort -V | uniq | tail -n 1)
-
-	if [[ -z "$hdr_file" ]]; then
-		echo -e "${TIP} 未找到与 ${abi} 配套的 Headers，将仅安装内核镜像。" >&2
-		return 0
-	fi
-	echo "${hdr_base}${hdr_file}"
-}
-
-# 确保 Debian Cloud 内核的配套 Headers 完整安装 (含 -common 与 linux-kbuild 依赖)。
-# get_cloud_headers_url 只下载 arch 专属那个 .deb，缺 -common 时头文件不完整、无法编译模块；
-# 这里在内核装好后用 apt 按 ABI 再确认一次，依赖由 apt 自动补齐 (幂等，已装全则秒返回)。
+# 确保 Debian Cloud 内核的配套 Headers 完整安装 (arch 专属 + -common + linux-kbuild)。
+# 内核镜像单独安装 (installcloud 给 install_kernel_generic 传空 headers)，headers 改在此处从 pool
+# 直取三件套后离线 apt 安装；这样即便是 backports (~bpoN) 内核、系统又没启用 backports 源，也能装全依赖。
 ensure_cloud_headers() {
 	local img_file="$1"
 	local debarch="$2"
 
-	# 从镜像文件名提取 ABI，如 6.1.0-18-cloud-amd64
-	local abi
+	# 从镜像文件名提取 ABI，如 6.17.13+deb13-cloud-amd64
+	local abi base pool="https://deb.debian.org/debian/pool/main/l/linux/"
 	abi=$(echo "$img_file" | sed -nE "s/^linux-image-(.*-cloud-${debarch})_.*/\1/p")
 	[[ -z "$abi" ]] && return 0
+	base="${abi%-cloud-${debarch}}"   # 6.17.13+deb13-cloud-amd64 -> 6.17.13+deb13
 
 	# 已存在编译用的 build 目录 (headers 完整) 则无需再动
 	if [[ -d "/lib/modules/${abi}/build" || -d "/usr/src/linux-headers-${abi}" ]]; then
@@ -748,13 +728,44 @@ ensure_cloud_headers() {
 		return 0
 	fi
 
-	echo -e "${INFO} 正在为内核 ${abi} 补齐配套 Headers (apt 自动解析 -common / kbuild 依赖)..."
-	apt-get update >/dev/null 2>&1
-	if DEBIAN_FRONTEND=noninteractive apt-get install -y "linux-headers-${abi}"; then
+	echo -e "${INFO} 正在为内核 ${abi} 补齐配套 Headers (arch + -common + kbuild，从 pool 直取以兼容 backports)..."
+
+	# 抓 pool 清单，抽出全部 headers/kbuild 文件名
+	local listing
+	listing=$(curl -sL --max-time 15 "$pool" | grep -oE '(linux-headers|linux-kbuild)-[^"]+\.deb')
+
+	# 先用 arch 专属 headers 定位版本号，再据此锁定同版本 common / kbuild，避免版本错配
+	local arch_hdr ver
+	arch_hdr=$(printf '%s\n' "$listing" | while read -r f; do
+		case "$f" in "linux-headers-${abi}_"*"_${debarch}.deb") echo "$f";; esac
+	done | sort -V | tail -n 1)
+	if [[ -z "$arch_hdr" ]]; then
+		echo -e "${TIP} pool 中未找到 ${abi} 的 headers，已跳过 (内核镜像不受影响，仅暂无法编译模块)。"
+		return 0
+	fi
+	ver="${arch_hdr#linux-headers-${abi}_}"; ver="${ver%_${debarch}.deb}"
+
+	# 组装同版本的 common / kbuild 文件名，仅当清单中确有该文件才纳入下载
+	local common_hdr="linux-headers-${base}-common_${ver}_all.deb"
+	local kbuild="linux-kbuild-${base}_${ver}_${debarch}.deb"
+	printf '%s\n' "$listing" | grep -qxF "$common_hdr" || common_hdr=""
+	printf '%s\n' "$listing" | grep -qxF "$kbuild" || kbuild=""
+
+	# 下载三件套到临时目录，一次性 apt 离线安装 (依赖自洽，无需启用 backports 源)
+	local work_dir debs=() f
+	work_dir=$(mktemp -d /tmp/cloud_hdr.XXXXXX) || { echo -e "${TIP} 无法创建临时目录，已跳过 headers。"; return 0; }
+	chmod 755 "$work_dir"
+	for f in "$arch_hdr" "$common_hdr" "$kbuild"; do
+		[[ -z "$f" ]] && continue
+		safe_wget "${pool}${f}" "${work_dir}/${f}" && debs+=("${work_dir}/${f}")
+	done
+
+	if [[ ${#debs[@]} -gt 0 ]] && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${debs[@]}"; then
 		echo -e "${INFO} 配套 Headers 已装好，可正常编译 LotSpeed / brutal 等内核模块。"
 	else
-		echo -e "${TIP} 未能通过 apt 装上 linux-headers-${abi}，如需编译模块请重启进新内核后手动安装对应 Headers。"
+		echo -e "${TIP} Headers 安装未完成 (下载失败或依赖冲突)，内核镜像不受影响；如需编译请重启后手动安装。"
 	fi
+	rm -rf "$work_dir"
 }
 
 # 安装官方 Cloud 内核
@@ -847,7 +858,7 @@ installcloud() {
 		# 记忆本次探测结果，下次进入默认选中
 		echo "$CLOUD_MAX_FILE" >"$CLOUD_STATE_FILE"
 		echo -e "${INFO} 探测完成！当前系统最高可安装版本: ${GREEN_FONT_PREFIX}${CLOUD_MAX_FILE}${FONT_COLOR_SUFFIX}，开始安装..."
-		if install_kernel_generic "Debian 官方 Cloud" "$(get_cloud_headers_url "$CLOUD_MAX_FILE" "$debarch")" "${img_url_base}${CLOUD_MAX_FILE}"; then
+		if install_kernel_generic "Debian 官方 Cloud" "" "${img_url_base}${CLOUD_MAX_FILE}"; then
 			ensure_cloud_headers "$CLOUD_MAX_FILE" "$debarch"
 		fi
 		return 0
@@ -870,8 +881,8 @@ installcloud() {
 	fi
 
 	local selected_file="${versions_array[$choice]}"
-	# 一并抓取配套 Headers，否则装完无法编译 brutal/LotSpeed 模块
-	if install_kernel_generic "Debian 官方 Cloud" "$(get_cloud_headers_url "$selected_file" "$debarch")" "${img_url_base}${selected_file}"; then
+	# 内核镜像单独安装 (headers 交给 ensure_cloud_headers 从 pool 直取，避免依赖拖垮镜像安装)
+	if install_kernel_generic "Debian 官方 Cloud" "" "${img_url_base}${selected_file}"; then
 		ensure_cloud_headers "$selected_file" "$debarch"
 	fi
 }
