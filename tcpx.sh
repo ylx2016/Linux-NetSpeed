@@ -11,6 +11,7 @@ readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ylx2016/Linux-NetSpee
 # 内核二进制 (bbr/bbrplus/lotserver) 已从仓库迁移到 Release，按目录整包托管，避免仓库臃肿。
 readonly KERNEL_RELEASE_BASE="https://github.com/ylx2016/Linux-NetSpeed/releases/download/kernels"
 readonly CLOUD_STATE_FILE="/etc/tcpx_cloud_lastver" # installcloud 记忆上次探测到的最高可安装 Cloud 内核
+readonly CLOUD_HDR_POOL="https://deb.debian.org/debian/pool/main/l/linux/" # Cloud 内核 headers (arch/-common/kbuild) 所在 pool
 
 # 自安装：把脚本落地到 /usr/local/bin/tcpx，安装后可直接输入 tcpx 运行。
 # 以 bash <(curl -fsSL <URL>) 这类管道方式运行时本地没有文件副本，只能从下面的地址重新下载。
@@ -641,18 +642,80 @@ installbbrplus() {
 # =================================================
 #  自动探测 Cloud 内核最高可安装版本 (依赖解析)
 # =================================================
-# 用法: detect_cloud_max <img_url_base> <file1> <file2> ...
+# 抓取 pool 目录清单，抽出所有 headers/kbuild 的 .deb 文件名 (供 headers 解析/校验复用)
+fetch_cloud_pool_listing() {
+	curl -sL --max-time 15 "$CLOUD_HDR_POOL" | grep -oE '(linux-headers|linux-kbuild)-[^"]+\.deb'
+}
+
+# 由 cloud image 文件名推导配套的三件 headers 包 (arch专属 + -common + kbuild) 文件名。
+# 参数: <image文件名> <debarch> <pool清单>；每行输出一个清单中确实存在的 .deb 文件名；无 arch headers 时返回 1。
+resolve_cloud_header_debs() {
+	local img_file="$1" debarch="$2" listing="$3"
+	local abi base
+	abi=$(echo "$img_file" | sed -nE "s/^linux-image-(.*-cloud-${debarch})_.*/\1/p")
+	[[ -z "$abi" ]] && return 1
+	base="${abi%-cloud-${debarch}}"   # 6.17.13+deb13-cloud-amd64 -> 6.17.13+deb13
+
+	# 先用 arch 专属 headers 定位版本号，再据此锁定同版本 common / kbuild，避免版本错配
+	local arch_hdr ver
+	arch_hdr=$(printf '%s\n' "$listing" | while read -r f; do
+		case "$f" in "linux-headers-${abi}_"*"_${debarch}.deb") echo "$f";; esac
+	done | sort -V | tail -n 1)
+	[[ -z "$arch_hdr" ]] && return 1
+	ver="${arch_hdr#linux-headers-${abi}_}"; ver="${ver%_${debarch}.deb}"
+
+	echo "$arch_hdr"
+	local common_hdr="linux-headers-${base}-common_${ver}_all.deb"
+	local kbuild="linux-kbuild-${base}_${ver}_${debarch}.deb"
+	printf '%s\n' "$listing" | grep -qxF "$common_hdr" && echo "$common_hdr"
+	printf '%s\n' "$listing" | grep -qxF "$kbuild" && echo "$kbuild"
+	return 0
+}
+
+# 模拟校验某 cloud 内核的配套 headers 三件套依赖能否干净满足 (口径与镜像校验一致)。
+# 参数: <image文件名> <debarch> <pool清单> <下载工作目录>；可满足返回 0，否则返回 1。
+check_cloud_headers_installable() {
+	local img_file="$1" debarch="$2" listing="$3" scan_dir="$4"
+	local hdr_files
+	hdr_files=$(resolve_cloud_header_debs "$img_file" "$debarch" "$listing") || return 1
+	[[ -z "$hdr_files" ]] && return 1
+
+	local debs=() hf
+	while read -r hf; do
+		[[ -z "$hf" ]] && continue
+		safe_wget "${CLOUD_HDR_POOL}${hf}" "${scan_dir}/${hf}" >/dev/null 2>&1 || return 1
+		debs+=("${scan_dir}/${hf}")
+	done <<< "$hdr_files"
+	[[ ${#debs[@]} -eq 0 ]] && return 1
+
+	local log
+	log=$(LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get install -s --no-install-recommends "${debs[@]}" 2>&1)
+	rm -f "${debs[@]}"
+	echo "$log" | grep -qiE "unmet dependencies|broken packages|E: " && return 1
+	echo "$log" | grep -q "will be REMOVED" && return 1
+	if echo "$log" | grep -q "will be upgraded"; then
+		local upgraded=$(echo "$log" | sed -n '/will be upgraded/,/^[^ ]/p' | tail -n +2)
+		echo "$upgraded" | grep -qwE "libc6|base-files|dpkg|systemd|systemd-sysv|bash|login|tzdata" && return 1
+	fi
+	return 0
+}
+
+# 用法: detect_cloud_max <img_url_base> <need_headers:0|1> <debarch> <file1> <file2> ...
 # 原理: pool 中混着 stable/testing/sid/experimental 全部内核，版本号最大 ≠ 能装。
 #       太新的内核依赖独立的 linux-modules-*-cloud-* 包（只存在于其自身发行版源），
 #       并可能要求更新的 linux-base / initramfs-tools / libc6。因此从新到旧逐个
 #       下载 image 包交给 `apt-get install -s` 做模拟安装(真实依赖解析器)，第一个
 #       “干净解析”的版本即当前系统最高可安装版本。
+#       need_headers=1 时还会额外模拟其配套 Headers 三件套，镜像与 Headers 都干净才选中，
+#       以此避开 +debN backports 这类"镜像能装、Headers 因 glibc/工具链过新装不了"的内核。
 # 结果写入全局变量 CLOUD_MAX_IDX / CLOUD_MAX_FILE (仍为 -1 / 空 表示无可用版本)
 CLOUD_MAX_IDX=-1
 CLOUD_MAX_FILE=""
 detect_cloud_max() {
 	local img_url_base="$1"
-	shift
+	local need_headers="$2"   # 1 = 同时要求配套 headers 依赖也可满足
+	local debarch="$3"
+	shift 3
 	local versions_array=("$@")
 	CLOUD_MAX_IDX=-1
 	CLOUD_MAX_FILE=""
@@ -661,6 +724,10 @@ detect_cloud_max() {
 	scan_work=$(mktemp -d /tmp/cloud_kernel_scan.XXXXXX) || return 1
 	trap 'cd /tmp; rm -rf "$scan_work"; trap - RETURN' RETURN
 	cd "$scan_work" || return 1
+
+	# 需要连 headers 一起校验时，预取一次 pool 清单循环复用 (所有版本共用同一 pool)
+	local hdr_listing=""
+	[[ "$need_headers" == "1" ]] && hdr_listing=$(fetch_cloud_pool_listing)
 
 	for ((i = ${#versions_array[@]} - 1; i >= 0; i--)); do
 		local f="${versions_array[$i]}"
@@ -699,10 +766,23 @@ detect_cloud_max() {
 		fi
 
 		if [[ $ok -eq 1 ]]; then
-			CLOUD_MAX_IDX=$i
-			CLOUD_MAX_FILE="$f"
-			echo -e "${GREEN_FONT_PREFIX}  ✓ 该版本依赖可干净满足${FONT_COLOR_SUFFIX}"
-			break
+			# 镜像依赖 OK；若还要求 headers，则继续校验配套 headers 依赖，两者都过才收下
+			if [[ "$need_headers" == "1" ]]; then
+				echo -e "${GREEN_FONT_PREFIX}  ✓ 镜像依赖可满足${FONT_COLOR_SUFFIX}，继续校验配套 Headers 依赖..."
+				if check_cloud_headers_installable "$f" "$debarch" "$hdr_listing" "$scan_work"; then
+					CLOUD_MAX_IDX=$i
+					CLOUD_MAX_FILE="$f"
+					echo -e "${GREEN_FONT_PREFIX}  ✓ 镜像 + Headers 依赖均可干净满足${FONT_COLOR_SUFFIX}"
+					break
+				else
+					echo -e "${TIP}  ✗ 该版本 Headers 依赖不满足 (多为跨发行版内核)，继续找更旧版本"
+				fi
+			else
+				CLOUD_MAX_IDX=$i
+				CLOUD_MAX_FILE="$f"
+				echo -e "${GREEN_FONT_PREFIX}  ✓ 该版本依赖可干净满足${FONT_COLOR_SUFFIX}"
+				break
+			fi
 		else
 			echo -e "${TIP}  ✗ 该版本依赖冲突，已跳过"
 		fi
@@ -710,9 +790,6 @@ detect_cloud_max() {
 	# 临时目录由 RETURN trap 统一清理
 }
 
-# 由 signed image 包名推导配套的 headers 下载地址
-# 例: linux-image-6.1.0-18-cloud-amd64_6.1.76-1_amd64.deb
-#     -> linux-headers-6.1.0-18-cloud-amd64_6.1.76-1_amd64.deb (位于 pool/main/l/linux/)
 # 确保 Debian Cloud 内核的配套 Headers 完整安装 (arch 专属 + -common + linux-kbuild)。
 # 内核镜像单独安装 (installcloud 给 install_kernel_generic 传空 headers)，headers 改在此处从 pool
 # 直取三件套后离线 apt 安装；这样即便是 backports (~bpoN) 内核、系统又没启用 backports 源，也能装全依赖。
@@ -721,10 +798,9 @@ ensure_cloud_headers() {
 	local debarch="$2"
 
 	# 从镜像文件名提取 ABI，如 6.17.13+deb13-cloud-amd64
-	local abi base pool="https://deb.debian.org/debian/pool/main/l/linux/"
+	local abi
 	abi=$(echo "$img_file" | sed -nE "s/^linux-image-(.*-cloud-${debarch})_.*/\1/p")
 	[[ -z "$abi" ]] && return 0
-	base="${abi%-cloud-${debarch}}"   # 6.17.13+deb13-cloud-amd64 -> 6.17.13+deb13
 
 	# 已存在编译用的 build 目录 (headers 完整) 则无需再动
 	if [[ -d "/lib/modules/${abi}/build" || -d "/usr/src/linux-headers-${abi}" ]]; then
@@ -733,39 +809,37 @@ ensure_cloud_headers() {
 	fi
 
 	echo -e "${INFO} 正在为内核 ${abi} 补齐配套 Headers (arch + -common + kbuild，从 pool 直取以兼容 backports)..."
-
-	# 抓 pool 清单，抽出全部 headers/kbuild 文件名
-	local listing
-	listing=$(curl -sL --max-time 15 "$pool" | grep -oE '(linux-headers|linux-kbuild)-[^"]+\.deb')
-
-	# 先用 arch 专属 headers 定位版本号，再据此锁定同版本 common / kbuild，避免版本错配
-	local arch_hdr ver
-	arch_hdr=$(printf '%s\n' "$listing" | while read -r f; do
-		case "$f" in "linux-headers-${abi}_"*"_${debarch}.deb") echo "$f";; esac
-	done | sort -V | tail -n 1)
-	if [[ -z "$arch_hdr" ]]; then
+	local listing hdr_files
+	listing=$(fetch_cloud_pool_listing)
+	hdr_files=$(resolve_cloud_header_debs "$img_file" "$debarch" "$listing")
+	if [[ -z "$hdr_files" ]]; then
 		echo -e "${TIP} pool 中未找到 ${abi} 的 headers，已跳过 (内核镜像不受影响，仅暂无法编译模块)。"
 		return 0
 	fi
-	ver="${arch_hdr#linux-headers-${abi}_}"; ver="${ver%_${debarch}.deb}"
-
-	# 组装同版本的 common / kbuild 文件名，仅当清单中确有该文件才纳入下载
-	local common_hdr="linux-headers-${base}-common_${ver}_all.deb"
-	local kbuild="linux-kbuild-${base}_${ver}_${debarch}.deb"
-	printf '%s\n' "$listing" | grep -qxF "$common_hdr" || common_hdr=""
-	printf '%s\n' "$listing" | grep -qxF "$kbuild" || kbuild=""
 
 	# 下载三件套到临时目录，一次性 apt 离线安装 (依赖自洽，无需启用 backports 源)
 	local work_dir debs=() f
 	work_dir=$(mktemp -d /tmp/cloud_hdr.XXXXXX) || { echo -e "${TIP} 无法创建临时目录，已跳过 headers。"; return 0; }
 	chmod 755 "$work_dir"
-	for f in "$arch_hdr" "$common_hdr" "$kbuild"; do
+	while read -r f; do
 		[[ -z "$f" ]] && continue
-		safe_wget "${pool}${f}" "${work_dir}/${f}" && debs+=("${work_dir}/${f}")
-	done
+		safe_wget "${CLOUD_HDR_POOL}${f}" "${work_dir}/${f}" && debs+=("${work_dir}/${f}")
+	done <<< "$hdr_files"
 
-	if [[ ${#debs[@]} -gt 0 ]] && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${debs[@]}"; then
+	local apt_out rc=1
+	if [[ ${#debs[@]} -gt 0 ]]; then
+		apt_out=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${debs[@]}" 2>&1)
+		rc=$?
+	fi
+	if [[ $rc -eq 0 ]]; then
 		echo -e "${INFO} 配套 Headers 已装好，可正常编译 LotSpeed / brutal 等内核模块。"
+	elif printf '%s' "$apt_out" | grep -qE 'libc6 \(>= 2\.(3[89]|[4-9])|t64 |gcc-[0-9]+-for-host'; then
+		# 跨发行版内核 (如 +debN backports) 的 Headers 依赖更新的 glibc/工具链，当前较旧系统满足不了。
+		# 内核镜像本身是自包含的能装上，但 Headers 编译环境装不了——与之前 LotSpeed 的 GLIBC_2.38 同源。
+		echo -e "${TIP} Headers 无法安装：内核 ${abi} 是较新发行版的 backports 版，其 Headers 依赖更新的 glibc/工具链，"
+		echo -e "${TIP}       与当前系统 (Debian $(cat /etc/debian_version 2>/dev/null)) 不兼容。内核镜像不受影响。"
+		echo -e "${TIP} 建议：仅用 BBR 无需 Headers，重启进新内核即可；若要编译模块，请改装与本系统同发行版的 Cloud 内核"
+		echo -e "${TIP}       (菜单里选不带 +debN 的版本，或输入 'h' 走 apt 装配套 headers)。"
 	else
 		echo -e "${TIP} Headers 安装未完成 (下载失败或依赖冲突)，内核镜像不受影响；如需编译请重启后手动安装。"
 	fi
@@ -849,13 +923,30 @@ installcloud() {
 
 	# ---- a: 自动逐个尝试判断最高可安装版本 ----
 	if [[ "$choice" =~ ^[aA]$ ]]; then
-		echo -e "${INFO} 开始自动探测最高可安装的 Cloud 内核版本（从新到旧逐个依赖校验）..."
-		detect_cloud_max "$img_url_base" "${versions_array[@]}"
+		# 先问是否需要 Headers：只装内核跑 BBR 不需要 Headers；要编译 LotSpeed/brutal 等模块才需要。
+		# 需要时探测会同时校验内核镜像 + 配套 Headers 依赖，只有两者都能干净安装的版本才会被选中，
+		# 从而自动避开像 +debN backports 这种"镜像能装、Headers 因 glibc/工具链过新装不了"的内核。
+		local need_headers=0 ans
+		echo -e "${INFO} 是否需要安装内核 Headers？(编译 LotSpeed / brutal 等内核模块才需要；只用 BBR 不需要)"
+		read -e -p "需要 Headers 请输 y，只装内核直接回车 [y/N]: " ans
+		[[ "$ans" =~ ^[yY]$ ]] && need_headers=1
+
+		if [[ $need_headers -eq 1 ]]; then
+			echo -e "${INFO} 开始自动探测：要求 内核镜像 + 配套 Headers 依赖同时可满足（从新到旧逐个校验，稍慢）..."
+		else
+			echo -e "${INFO} 开始自动探测最高可安装的 Cloud 内核版本（仅校验内核镜像依赖）..."
+		fi
+		detect_cloud_max "$img_url_base" "$need_headers" "$debarch" "${versions_array[@]}"
 		if [[ $CLOUD_MAX_IDX -lt 0 || -z "$CLOUD_MAX_FILE" ]]; then
 			echo -e "${TIP} 未找到可干净安装的 pool 版本，已回退到 apt 官方源安装 (最稳妥)。"
-			echo -e "${INFO} 正在使用 apt 安装 Cloud 内核及 Headers..."
 			apt-get update >/dev/null 2>&1
-			apt-get install -y "linux-image-cloud-${debarch}" "linux-headers-cloud-${debarch}"
+			if [[ $need_headers -eq 1 ]]; then
+				echo -e "${INFO} 正在使用 apt 安装 Cloud 内核及 Headers..."
+				apt-get install -y "linux-image-cloud-${debarch}" "linux-headers-cloud-${debarch}"
+			else
+				echo -e "${INFO} 正在使用 apt 安装 Cloud 内核..."
+				apt-get install -y "linux-image-cloud-${debarch}"
+			fi
 			BBR_grub
 			return 0
 		fi
@@ -863,7 +954,7 @@ installcloud() {
 		echo "$CLOUD_MAX_FILE" >"$CLOUD_STATE_FILE"
 		echo -e "${INFO} 探测完成！当前系统最高可安装版本: ${GREEN_FONT_PREFIX}${CLOUD_MAX_FILE}${FONT_COLOR_SUFFIX}，开始安装..."
 		if install_kernel_generic "Debian 官方 Cloud" "" "${img_url_base}${CLOUD_MAX_FILE}"; then
-			ensure_cloud_headers "$CLOUD_MAX_FILE" "$debarch"
+			[[ $need_headers -eq 1 ]] && ensure_cloud_headers "$CLOUD_MAX_FILE" "$debarch"
 		fi
 		return 0
 	fi
