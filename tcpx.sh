@@ -730,6 +730,33 @@ get_cloud_headers_url() {
 	echo "${hdr_base}${hdr_file}"
 }
 
+# 确保 Debian Cloud 内核的配套 Headers 完整安装 (含 -common 与 linux-kbuild 依赖)。
+# get_cloud_headers_url 只下载 arch 专属那个 .deb，缺 -common 时头文件不完整、无法编译模块；
+# 这里在内核装好后用 apt 按 ABI 再确认一次，依赖由 apt 自动补齐 (幂等，已装全则秒返回)。
+ensure_cloud_headers() {
+	local img_file="$1"
+	local debarch="$2"
+
+	# 从镜像文件名提取 ABI，如 6.1.0-18-cloud-amd64
+	local abi
+	abi=$(echo "$img_file" | sed -nE "s/^linux-image-(.*-cloud-${debarch})_.*/\1/p")
+	[[ -z "$abi" ]] && return 0
+
+	# 已存在编译用的 build 目录 (headers 完整) 则无需再动
+	if [[ -d "/lib/modules/${abi}/build" || -d "/usr/src/linux-headers-${abi}" ]]; then
+		echo -e "${INFO} 内核 ${abi} 的配套 Headers 已就绪，可直接编译内核模块。"
+		return 0
+	fi
+
+	echo -e "${INFO} 正在为内核 ${abi} 补齐配套 Headers (apt 自动解析 -common / kbuild 依赖)..."
+	apt-get update >/dev/null 2>&1
+	if DEBIAN_FRONTEND=noninteractive apt-get install -y "linux-headers-${abi}"; then
+		echo -e "${INFO} 配套 Headers 已装好，可正常编译 LotSpeed / brutal 等内核模块。"
+	else
+		echo -e "${TIP} 未能通过 apt 装上 linux-headers-${abi}，如需编译模块请重启进新内核后手动安装对应 Headers。"
+	fi
+}
+
 # 安装官方 Cloud 内核
 installcloud() {
 	pre_install_check || return 1
@@ -820,7 +847,9 @@ installcloud() {
 		# 记忆本次探测结果，下次进入默认选中
 		echo "$CLOUD_MAX_FILE" >"$CLOUD_STATE_FILE"
 		echo -e "${INFO} 探测完成！当前系统最高可安装版本: ${GREEN_FONT_PREFIX}${CLOUD_MAX_FILE}${FONT_COLOR_SUFFIX}，开始安装..."
-		install_kernel_generic "Debian 官方 Cloud" "$(get_cloud_headers_url "$CLOUD_MAX_FILE" "$debarch")" "${img_url_base}${CLOUD_MAX_FILE}"
+		if install_kernel_generic "Debian 官方 Cloud" "$(get_cloud_headers_url "$CLOUD_MAX_FILE" "$debarch")" "${img_url_base}${CLOUD_MAX_FILE}"; then
+			ensure_cloud_headers "$CLOUD_MAX_FILE" "$debarch"
+		fi
 		return 0
 	fi
 
@@ -842,7 +871,9 @@ installcloud() {
 
 	local selected_file="${versions_array[$choice]}"
 	# 一并抓取配套 Headers，否则装完无法编译 brutal/LotSpeed 模块
-	install_kernel_generic "Debian 官方 Cloud" "$(get_cloud_headers_url "$selected_file" "$debarch")" "${img_url_base}${selected_file}"
+	if install_kernel_generic "Debian 官方 Cloud" "$(get_cloud_headers_url "$selected_file" "$debarch")" "${img_url_base}${selected_file}"; then
+		ensure_cloud_headers "$selected_file" "$debarch"
+	fi
 }
 
 # 从 Release (kernels) 拉取指定内核二进制整包并解压到目标目录。
