@@ -528,13 +528,17 @@ install_kernel_generic() {
 		fi
 	fi
 
-	# 验证 /boot 中确实新增了内核镜像，避免"装失败却报成功"
+	# 验证内核镜像确实就位，避免"装失败却报成功"。
+	# apt-get install ./deb 已返回成功，说明包已在系统里 (新装或早已安装)；
+	# 这里只防御 apt-get -f 把刚装的内核又自动卸掉的情况——那会让镜像数"不增反减"。
+	# 数目持平属正常 (目标内核本就已安装的幂等重跑)，不算失败，需继续处理 headers。
 	local vmlinuz_after=$(ls -1 /boot/vmlinuz-* 2>/dev/null | wc -l)
-	if [[ "$vmlinuz_after" -le "$vmlinuz_before" ]]; then
-		echo -e "${ERROR} /boot 中未检测到新增的内核镜像，安装可能未真正生效！"
+	if [[ "$vmlinuz_after" -lt "$vmlinuz_before" ]]; then
+		echo -e "${ERROR} /boot 中的内核镜像不增反减，安装可能被回滚 (依赖冲突)！"
 		echo -e "${TIP} 请勿重启，先用菜单 [51] 确认当前内核状态。"
 		return 1
 	fi
+	[[ "$vmlinuz_after" -eq "$vmlinuz_before" ]] && echo -e "${INFO} 目标内核镜像已存在 (无需重复安装)，继续处理配套组件..."
 
 	echo -e "${INFO} ${kernel_desc} 内核包安装完成，正在更新系统引导..."
 	BBR_grub
