@@ -729,8 +729,26 @@ detect_cloud_max() {
 	local hdr_listing=""
 	[[ "$need_headers" == "1" ]] && hdr_listing=$(fetch_cloud_pool_listing)
 
+	# 提速优化：candidate 文件名里的 +debN 表示该内核面向哪个 Debian 大版本。
+	# 当前系统若是纯 Debian，凡 +debN 高于本机大版本的候选，其 Headers 必然依赖更新的
+	# glibc/工具链 (如 deb13 headers 需 glibc≥2.38 而 deb12 只有 2.36) — 直接跳过不下载，
+	# 免去逐个下载+apt 模拟才发现装不上的耗时。仅在 need_headers 时启用 (只装镜像时高版本仍可用)。
+	# Ubuntu 等衍生系 OS_VERSION_ID 语义不同 (如 24.04) 无法与 debN 比较，故仅限 OS_ID=debian。
+	local host_deb=""
+	if [[ "$need_headers" == "1" && "${OS_ID}" == "debian" ]]; then
+		host_deb="${OS_VERSION_ID%%.*}"
+		[[ "$host_deb" =~ ^[0-9]+$ ]] || host_deb=""
+	fi
+
 	for ((i = ${#versions_array[@]} - 1; i >= 0; i--)); do
 		local f="${versions_array[$i]}"
+		if [[ -n "$host_deb" ]]; then
+			local cand_deb=$(echo "$f" | grep -oE '\+deb[0-9]+' | grep -oE '[0-9]+')
+			if [[ -n "$cand_deb" && "$cand_deb" -gt "$host_deb" ]]; then
+				echo -e "${TIP}  ✗ ${f} 面向 Debian ${cand_deb} (高于当前 Debian ${host_deb})，Headers 依赖更新工具链，快速跳过"
+				continue
+			fi
+		fi
 		echo -e "${INFO} 正在探测候选内核: ${f} ..."
 		if ! safe_wget "${img_url_base}${f}" "probe.deb" >/dev/null 2>&1; then
 			continue
@@ -854,6 +872,25 @@ installcloud() {
 		echo -e "${ERROR} Cloud 内核仅支持 Debian 系系统"
 		return 1
 	}
+
+	# Ubuntu 及衍生版：没有 Debian 那套 pool/+debN 云内核，逐版本探测无从谈起 (deb.debian.org
+	# 的包名与 Ubuntu apt 对不上，'linux-image-cloud-amd64' 在 Ubuntu 也不存在)。
+	# Ubuntu 的云/虚拟机等价物是 apt 元包 linux-image-virtual，直接走 apt 最稳妥。
+	if [[ "${OS_ID}" == "ubuntu" || "${OS_ID}" == "pop" || "${OS_ID_LIKE}" == *"ubuntu"* ]]; then
+		echo -e "${INFO} 检测到 Ubuntu/衍生系：Cloud 内核对应 apt 元包 linux-image-virtual (随发行版滚动更新)。"
+		local u_ans u_hdr=""
+		read -e -p "是否同时安装配套 Headers？(编译内核模块才需要) [y/N]: " u_ans
+		[[ "$u_ans" =~ ^[yY]$ ]] && u_hdr="linux-headers-virtual"
+		apt-get update >/dev/null 2>&1
+		if apt-get install -y linux-image-virtual $u_hdr; then
+			echo -e "${INFO} Ubuntu 云内核 (linux-image-virtual${u_hdr:+ + linux-headers-virtual}) 安装完成。"
+			BBR_grub
+		else
+			echo -e "${ERROR} apt 安装 linux-image-virtual 失败，请检查网络与 apt 源。"
+			return 1
+		fi
+		return 0
+	fi
 
 	local debarch
 	if [[ "$OS_ARCH" == "x86_64" ]]; then
@@ -2753,7 +2790,9 @@ check_status() {
 		if [[ -z "$installed_headers" ]]; then
 			headers_status="未安装"
 		else
-			if echo "$installed_headers" | grep -q -E "kernel(-ml|-lt|-uek|-rt|-plus)?-(devel|headers)-${kernel_version_full}"; then
+			# 用固定字符串匹配 (kernel_version_full 含 + . 等正则元字符, -E 会误判)。
+			# 已过滤过的行必为 kernel*-devel/headers-*, 只需核对版本后缀是否为当前内核。
+			if echo "$installed_headers" | grep -qF -e "-devel-${kernel_version_full}" -e "-headers-${kernel_version_full}"; then
 				headers_status="已匹配"
 			else
 				headers_status="未匹配"
@@ -2764,7 +2803,8 @@ check_status() {
 		if [[ -z "$installed_headers" ]]; then
 			headers_status="未安装"
 		else
-			if echo "$installed_headers" | grep -q -E "(linux|proxmox|pve|raspberrypi)-headers-${kernel_version_full}"; then
+			# 同理用固定字符串匹配, 避免 6.12.95+deb12-cloud-amd64 里的 + 被当量词。
+			if echo "$installed_headers" | grep -qF -- "-headers-${kernel_version_full}"; then
 				headers_status="已匹配"
 			else
 				headers_status="未匹配"
