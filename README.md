@@ -20,11 +20,6 @@ bash <(curl -fsSL https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/maste
   - `./tcpx.sh op3` → 对应菜单 `38`
 - 关联 GitHub Actions 自动编译内核：<https://github.com/ylx2016/kernel/>
 
-### IP 质量检测
-
-```bash
-bash <(curl -Ls IP.Check.Place)
-```
 
 ## BBR + 锐速 双开
 
@@ -121,3 +116,4 @@ ylx2016 与 chiakge、cx9208 无任何关系。
 ![支付宝赞助](https://vip1.loli.io/2020/03/12/7IJvKaTcrLBDbtz.png)
 
 相关工具：[搬瓦工在线库存查询](https://bwg.ylx.me/)
+         [公益toekn](https://tabitoken.com/sign-up?aff=gPYe)
