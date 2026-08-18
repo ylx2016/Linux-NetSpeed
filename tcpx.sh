@@ -85,16 +85,13 @@ check_sys() {
 
 	echo -e "${INFO} 检测到系统: ${OS_TYPE} (${OS_ID} ${OS_VERSION_ID}) - 架构: ${OS_ARCH}"
 
-	# 4. 精简依赖检查 (抛弃笨重的 lsb_release，引入轻量的 jq 用于后续 API 解析)
-	local required_cmds=("curl" "wget" "awk" "jq")
+	# 4. 精简依赖检查 (抛弃笨重的 lsb_release；API 的 JSON 解析已改用 grep，不再依赖 jq)
+	local required_cmds=("curl" "wget" "awk")
 
 	if [[ "${OS_TYPE}" == "CentOS" ]]; then
 		for cmd in "${required_cmds[@]}"; do
 			if ! command -v "$cmd" >/dev/null 2>&1; then
 				echo -e "${INFO} 正在安装缺失依赖: $cmd ..."
-				if [[ "$cmd" == "jq" ]] && ! rpm -q epel-release >/dev/null 2>&1; then
-					yum install -y epel-release >/dev/null 2>&1
-				fi
 				yum install -y "$cmd" >/dev/null 2>&1
 			fi
 		done
@@ -124,7 +121,7 @@ check_sys() {
 	fi
 
 	# 4.1 依赖复检：上面所有安装命令的输出都被重定向丢弃了，装失败也毫无提示。
-	# 若不在此处硬失败，后续 get_github_asset 会因缺少 jq 而静默返回空，
+	# 若不在此处硬失败，后续联网抓取会因缺少 curl/wget 而静默失败，
 	# 用户只能看到"无法获取资源列表"这种完全误导性的报错。
 	local missing_cmds=()
 	for cmd in "${required_cmds[@]}"; do
@@ -137,7 +134,7 @@ check_sys() {
 		done
 		echo -e "${TIP} 请先手动安装后重试，例如:"
 		if [[ "${OS_TYPE}" == "CentOS" ]]; then
-			echo -e "  yum install -y epel-release && yum install -y ${missing_cmds[*]}"
+			echo -e "  yum install -y ${missing_cmds[*]}"
 		else
 			echo -e "  apt-get update && apt-get install -y ${missing_cmds[*]}"
 		fi
@@ -375,7 +372,7 @@ safe_wget() {
 	return 1
 }
 
-# 3. 稳健的 GitHub 资源获取函数 (使用 jq 提取 JSON，再通过 grep 多重过滤)
+# 3. 稳健的 GitHub 资源获取函数 (用 grep 从 JSON 提取下载直链，再通过 grep 多重过滤)
 # 用法: get_github_asset <仓库名> <Tag关键词> <文件名关键词>
 # 示例: get_github_asset "ylx2016/kernel" "Debian_Kernel" "headers"
 get_github_asset() {
@@ -391,8 +388,11 @@ get_github_asset() {
 		return 1
 	fi
 
-	# 提取出该仓库所有的下载直链
-	local all_urls=$(echo "$response" | jq -r '.[].assets[]?.browser_download_url' 2>/dev/null)
+	# 提取出该仓库所有的下载直链。
+	# 原用 jq，现改为纯 grep：browser_download_url 字段仅出现在 release 资源(assets)里，
+	# 且 GitHub API 不转义 URL 中的斜杠，故按字段名精确匹配后取其 https 值即可，
+	# 效果等价于 jq -r '.[].assets[]?.browser_download_url'，同时免去 jq (及 CentOS 的 EPEL) 依赖。
+	local all_urls=$(echo "$response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+"' | grep -oE 'https?://[^"]+')
 	if [[ -z "$all_urls" ]]; then
 		echo -e "${ERROR} 无法从 ${repo} 获取资源列表，请检查网络或稍后再试！" >&2
 		return 1
@@ -577,8 +577,11 @@ installbbr() {
 	head_url=$(get_github_asset "ylx2016/kernel" "${tag_kw}" "headers" "${arch_kw}")
 	img_url=$(get_github_asset "ylx2016/kernel" "${tag_kw}" "${img_kw}" "${arch_kw}")
 
-	# 【核心修复 2】利用 -oE 标准正则提取版本号，避免部分系统不支持 -P 导致版本号变空
-	local kernel_version=$(echo "$img_url" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+	# 【核心修复 2】版本号仅用于界面显示：只从文件名 (${img_url##*/}) 中提取，切勿扫描整条 URL。
+	# 因为发布 tag 内含构建日期 (如 Debian_Kernel_Cloud_7.2_bbr_2026.08.18-0005)，整条 URL 的首个
+	# N.N.N 会误命中日期 2026.08.18；而文件名 linux-image-7.2.0_... 的首个 N.N.N 才是真内核版本。
+	# 用 -oE 标准正则 (而非 -P) 以兼容不支持 PCRE 的老系统。
+	local kernel_version=$(echo "${img_url##*/}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
 
 	if [[ -n "$kernel_version" ]]; then
 		echo -e "${INFO} 解析成功！获取到的最新云端内核版本为: \033[32m${kernel_version}\033[0m"
@@ -615,7 +618,7 @@ installbbrplusnew() {
 	head_url=$(get_github_asset "UJX6N/bbrplus-6.x_stable" "${tag_kw}" "headers" "${arch_kw}.*${ext}")
 	img_url=$(get_github_asset "UJX6N/bbrplus-6.x_stable" "${tag_kw}" "${img_kw}" "${arch_kw}.*${ext}")
 
-	local kernel_version=$(echo "$img_url" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+	local kernel_version=$(echo "${img_url##*/}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
 	install_kernel_generic "BBRplus(UJX6N)新版内核" "$head_url" "$img_url" "$kernel_version"
 }
 
