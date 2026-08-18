@@ -115,5 +115,10 @@ ylx2016 与 chiakge、cx9208 无任何关系。
 
 ![支付宝赞助](https://vip1.loli.io/2020/03/12/7IJvKaTcrLBDbtz.png)
 
+## 公益AI
+- [tabitoken](https://tabitoken.com/sign-up?aff=gPYe)
+- [agentrouter](https://agentrouter.org/register?aff=d3mq)
+
 相关工具：[搬瓦工在线库存查询](https://bwg.ylx.me/)
-         [公益toekn](https://tabitoken.com/sign-up?aff=gPYe)
+
+
