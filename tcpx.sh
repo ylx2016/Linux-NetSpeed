@@ -6,7 +6,7 @@ export PATH
 # =================================================
 #  全局配置区 (Configuration as Data)
 # =================================================
-readonly SH_VER="100.0.6.8"
+readonly SH_VER="100.0.6.9"
 readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 # 内核二进制 (bbr/bbrplus/lotserver) 已从仓库迁移到 Release，按目录整包托管，避免仓库臃肿。
 readonly KERNEL_RELEASE_BASE="https://github.com/ylx2016/Linux-NetSpeed/releases/download/kernels"
@@ -1618,6 +1618,74 @@ set_ecn() {
 	[[ "$status" == "1" ]] && echo -e "${INFO} ECN 已开启！" || echo -e "${INFO} ECN 已关闭！"
 }
 
+# tcpfit 手动还原 —— 仅在 /usr/local/bin/tcpfit 程序缺失时的兜底路径。
+# 正常走 tcpfit 自带 rollback；这里复刻其关键还原步骤，尽量把机器还原到 tcpfit
+# 调优前：停用整形、按快照回写 sysctl、拆掉出向整形 qdisc、复原默认路由。
+_tcpfit_manual_restore() {
+	local snap="/var/lib/tcpfit/pre-tune.snapshot"
+	local iface gw
+	systemctl disable --now tcpfit-qdisc.service >/dev/null 2>&1
+	# 默认路由网卡：先查 v4，纯 v6 机器回退查 v6
+	iface=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')
+	[[ -z "$iface" ]] && iface=$(ip -6 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')
+	[[ -n "$iface" ]] && tc qdisc del dev "$iface" root 2>/dev/null
+	gw=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="via"){print $(i+1); exit}}')
+	[[ -n "$gw" && -n "$iface" ]] && ip route replace default via "$gw" dev "$iface" 2>/dev/null
+	if [[ -f "$snap" ]]; then
+		# 快照行形如 "net.core.rmem_max = 212992"，按第一个 = 拆分后逐项回写
+		grep -E '^(net|vm|fs)\.' "$snap" | while IFS='=' read -r _k _v; do
+			_k=$(echo "$_k" | xargs); _v=$(echo "$_v" | xargs)
+			[[ -n "$_k" && -n "$_v" ]] && sysctl -qw "$_k=$_v" 2>/dev/null
+		done
+		echo -e "${INFO} 已按 tcpfit 快照还原 sysctl。"
+	else
+		echo -e "${TIP} 未找到 tcpfit 快照，仅移除其配置文件；已生效的运行值将在重启后回到内核默认。"
+	fi
+	if [[ -f /var/lib/tcpfit/swapfile.owned ]]; then
+		echo -e "${TIP} 检测到 tcpfit 创建的 /swapfile；为避免误删占用中的 swap，未自动移除。"
+		echo -e "${TIP} 如需删除请手动确认后执行: swapoff /swapfile && rm -f /swapfile 并清理 /etc/fstab。"
+	fi
+}
+
+# 应用户要求：彻底卸载时一并"还原 + 清理"tcpfit。
+# ① 还原 tcpfit 的全部改动：优先调用 tcpfit 自带 rollback（权威，按快照精确回写
+#    sysctl、拆 qdisc、复原路由、停用并删 systemd 单元/路由钩子/模块自加载）；
+#    程序缺失时退回 _tcpfit_manual_restore 兜底。
+# ② 清理 tcpfit 本体：rollback 不会删除程序与状态目录，这里补齐真正的"卸载"。
+remove_tcpfit_full() {
+	echo -e "${INFO} 正在还原并清理 tcpfit ..."
+	if [[ -x /usr/local/bin/tcpfit ]]; then
+		# --purge-swap: 连 tcpfit 自建的 swap 一并撤销。tcpfit 内部有安全门禁
+		# (仅删自己创建且能成功 swapoff 的，外来或换不回内存的 swap 一律不动)，
+		# 故此处放心传入。
+		echo -e "${INFO} 调用 tcpfit rollback 还原其全部改动 ..."
+		/usr/local/bin/tcpfit rollback --purge-swap ||
+			echo -e "${TIP} tcpfit rollback 返回非 0，继续清理其残留文件。"
+	else
+		echo -e "${TIP} 未找到 /usr/local/bin/tcpfit 程序，改用兜底方式还原。"
+		_tcpfit_manual_restore
+	fi
+
+	# 清理本体与残留（先还原后删除，确保 rollback/兜底能读到快照）
+	systemctl disable --now tcpfit-qdisc.service >/dev/null 2>&1
+	rm -f /etc/systemd/system/tcpfit-qdisc.service /usr/local/sbin/tcpfit-qdisc.sh
+	rm -f /etc/sysctl.d/99-tcpfit.conf
+	rm -f /etc/networkd-dispatcher/routable.d/50-tcpfit-initcwnd
+	rm -f /etc/modules-load.d/tcpfit-bbr.conf
+	rm -f /usr/local/bin/tcpfit /usr/local/sbin/tcpfit.sh
+	rm -rf /var/lib/tcpfit
+	# 顺带清掉 tcpfit v0.3.1 之前旧名 nettune 的残留，避免改名前的老部署漏网
+	systemctl disable --now nettune-qdisc.service >/dev/null 2>&1
+	rm -f /etc/systemd/system/nettune-qdisc.service /usr/local/sbin/nettune-qdisc.sh
+	rm -f /etc/sysctl.d/99-nettune.conf /etc/networkd-dispatcher/routable.d/50-nettune-initcwnd
+	rm -f /etc/modules-load.d/nettune-bbr.conf /usr/local/sbin/nettune.sh
+	rm -rf /var/lib/nettune
+
+	systemctl daemon-reload >/dev/null 2>&1
+	sysctl --system >/dev/null 2>&1
+	echo -e "${INFO} tcpfit 已还原并清理完成。"
+}
+
 # 彻底卸载全部加速与优化 (抛弃几十个 sed 删除，直接清空文件)
 remove_all() {
 	echo -e "${INFO} 正在清空网络优化与系统限制..."
@@ -1648,10 +1716,21 @@ remove_all() {
 	rm -f /etc/modules-load.d/tcpx-conntrack.conf
 	rm -f /etc/modprobe.d/tcpx-conntrack.conf
 	systemctl daemon-reload >/dev/null 2>&1
-	# tcpfit 是独立工具，其 sysctl/整形/systemd 单元不归本脚本管理，须单独回滚
+	# tcpfit 是独立工具，其 sysctl/整形/systemd 单元/程序本体默认不归本脚本管理。
+	# 应用户要求：检测到时询问是否一并还原并清理 (默认否，回车即保留)。
 	if tcpfit_present; then
-		echo -e "${TIP} 检测到 tcpfit 仍在管理本机网络参数 (99-tcpfit.conf / tcpfit-qdisc.service 等)。"
-		echo -e "${TIP} tcpx 不会替它卸载，如需彻底还原请另外执行: tcpfit rollback"
+		echo
+		echo -e "${TIP} 检测到 tcpfit 仍在管理本机网络参数 (99-tcpfit.conf / tcpfit-qdisc.service / /var/lib/tcpfit 等)。"
+		echo -e "${TIP} 选择清理将会："
+		echo -e "        1) 还原 tcpfit 的全部改动 (按快照回写 sysctl、拆除出向整形 qdisc、复原默认路由、停用并删除 systemd 单元与路由钩子)"
+		echo -e "        2) 删除 tcpfit 程序本体 (/usr/local/bin/tcpfit) 与状态目录 (/var/lib/tcpfit)"
+		echo -e "        3) 撤销 tcpfit 自建的 swap (仅限其创建且可安全 swapoff 的，外来 swap 不动)"
+		read -rp "是否一并还原并清理 tcpfit？(y=清理 / 回车=保留，默认否): " _tcpfit_ans
+		if [[ "$_tcpfit_ans" =~ ^[yY]$ ]]; then
+			remove_tcpfit_full
+		else
+			echo -e "${INFO} 已保留 tcpfit。如需彻底还原请执行: tcpfit rollback (加 --purge-swap 连 swap 一并撤销)。"
+		fi
 	fi
 	echo -e "${INFO} 系统已恢复原生状态。"
 }
@@ -2099,6 +2178,69 @@ Update_Shell() {
 	exec bash "$reload_path"
 }
 
+# 单独卸载本脚本 (tcpx 工具自身)
+# 与菜单 55「卸载全部加速」(remove_all) 的分工：
+#   - remove_all 只还原系统网络优化 (sysctl/加速/服务)，不会删除 tcpx 程序本体；
+#   - 本函数删除 tcpx 程序本体，并在删除前询问是否先执行 remove_all 还原系统优化。
+uninstall_tcpx() {
+	echo -e "${TIP} 即将卸载 tcpx 管理脚本本体。"
+	echo -e "${TIP} 默认仅删除 tcpx 程序文件，不会改动已应用的网络优化 (BBR/FQ/sysctl 等)。"
+	echo
+
+	# 卸载前先询问是否执行 remove_all 还原系统优化 (默认否，保留当前优化)
+	echo -e "${TIP} 是否在卸载前执行「卸载全部加速」(remove_all) 还原系统网络优化？"
+	echo -e "        y    = 先还原全部优化，再卸载脚本 (等同先执行菜单 55)"
+	echo -e "        回车 = 保留当前网络优化，仅卸载脚本 (默认否)"
+	read -rp "请选择 (y=先还原 / 回车=保留，默认否): " _restore_ans
+	if [[ "$_restore_ans" =~ ^[yY]$ ]]; then
+		remove_all
+	else
+		echo -e "${INFO} 已保留当前网络优化，仅卸载脚本本体。"
+	fi
+
+	echo
+	# 最终确认删除程序本体 (默认否)
+	read -rp "确认删除 tcpx 程序文件？(y=确认卸载 / 回车=取消，默认否): " _confirm
+	if [[ ! "$_confirm" =~ ^[yY]$ ]]; then
+		echo -e "${INFO} 已取消卸载，tcpx 仍保留在本机。"
+		return
+	fi
+
+	echo -e "${INFO} 正在卸载 tcpx ..."
+
+	local removed=0
+	local running_path
+	running_path=$(readlink -f "$0" 2>/dev/null || echo "$0")
+
+	# 1) 删除规范安装路径 /usr/local/bin/tcpx
+	if [[ -f "$TCPX_INSTALL_PATH" ]]; then
+		if rm -f "$TCPX_INSTALL_PATH"; then
+			echo -e "${INFO} 已删除 ${TCPX_INSTALL_PATH}"
+			removed=1
+		fi
+	fi
+
+	# 2) 若从非安装路径运行 (如 /root/tcpx.sh) 且为真实文件，一并删除该副本。
+	#    进程替换 (bash <(curl ...)) 下 $0 不是普通文件，[[ -f ]] 守卫会自动跳过。
+	if [[ -f "$running_path" && "$running_path" != "$TCPX_INSTALL_PATH" ]]; then
+		if rm -f "$running_path"; then
+			echo -e "${INFO} 已删除 ${running_path}"
+			removed=1
+		fi
+	fi
+
+	if [[ "$removed" -eq 1 ]]; then
+		echo -e "${INFO} tcpx 已卸载完成。"
+	else
+		echo -e "${TIP} 未发现可删除的 tcpx 程序文件 (可能以管道方式运行或已被删除)。"
+	fi
+
+	# 正在运行的脚本文件即便被删除，本进程仍可继续 (inode 保持打开)；
+	# 卸载后返回菜单已无意义，直接退出。
+	echo -e "${INFO} 感谢使用，已退出。"
+	exit 0
+}
+
 gotodd() {
 	echo -e "${INFO} 正在切换到一键 DD 系统脚本..."
 	local tmp_sh
@@ -2179,7 +2321,7 @@ get_system_info() {
 show_menu_panel() {
 	clear
 	echo && echo -e " TCP加速 一键安装管理脚本 ${RED_FONT_PREFIX}[v${SH_VER}] 不卸内核${FONT_COLOR_SUFFIX} from blog.ylx.me 母鸡慎用
- ${GREEN_FONT_PREFIX}0.${FONT_COLOR_SUFFIX} 升级脚本
+ ${GREEN_FONT_PREFIX}0.${FONT_COLOR_SUFFIX} 升级脚本                 ${GREEN_FONT_PREFIX}88.${FONT_COLOR_SUFFIX} 卸载本脚本
  ———————————————————————————— 内核安装 —————————————————————————————
  ${GREEN_FONT_PREFIX}1.${FONT_COLOR_SUFFIX} 安装 BBR自编编译内核     ${GREEN_FONT_PREFIX}7.${FONT_COLOR_SUFFIX} 安装 官方稳定内核
  ${GREEN_FONT_PREFIX}2.${FONT_COLOR_SUFFIX} 安装 BBRplus版内核       ${GREEN_FONT_PREFIX}8.${FONT_COLOR_SUFFIX} 安装 官方最新内核
@@ -2235,6 +2377,7 @@ start_menu() {
 
 		case "$num" in
 		0) Update_Shell ;;
+		88) uninstall_tcpx ;;
 		1) installbbr ;;
 		2) installbbrplus ;;
 		3) installlot ;;
