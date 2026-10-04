@@ -37,7 +37,7 @@ OS_VERSION_ID=""
 OS_ARCH=""
 
 # 检查当前用户是否为 root
-if [ "$EUID" -ne 0 ]; then
+if [[ "${BASH_SOURCE[0]}" == "$0" && "$EUID" -ne 0 ]]; then
 	echo -e "${ERROR} 请使用 root 用户身份运行此脚本"
 	exit 1
 fi
@@ -2758,6 +2758,64 @@ check_sys_official_bbr() {
 	echo -e "${TIP} 内核安装完毕。"
 }
 
+# XanMod 已改用发行版代号，旧的 releases suite 不再提供 Release 文件。
+resolve_xanmod_suite() {
+	local os_release="${1:-/etc/os-release}"
+	local debian_version="${2:-/etc/debian_version}"
+	local ID="" VERSION_CODENAME="" UBUNTU_CODENAME=""
+	[[ -f "$os_release" ]] && . "$os_release"
+	local candidates=("$VERSION_CODENAME" "$UBUNTU_CODENAME") suite
+	if [[ "$ID" == "debian" && -z "$VERSION_CODENAME" && -f "$debian_version" ]]; then
+		candidates+=("$(cut -d/ -f1 "$debian_version")")
+	fi
+	for suite in "${candidates[@]}"; do
+		[[ "$suite" =~ ^[a-z][a-z0-9-]*$ && "$suite" != "releases" ]] || continue
+		if curl -fsSL --max-time 15 -o /dev/null "https://deb.xanmod.org/dists/${suite}/Release"; then
+			printf '%s\n' "$suite"
+			return 0
+		fi
+	done
+	echo -e "${ERROR} XanMod 未提供当前发行版的软件源，或源暂时无法访问。请使用官方内核或稍后重试。" >&2
+	return 1
+}
+
+# 迁移旧 XanMod 源；保留同一文件内的其他仓库，兼容 .list 和 deb822 .sources。
+remove_xanmod_sources() {
+	local apt_dir="${1:-/etc/apt}" file tmp
+	for file in "$apt_dir/sources.list" "$apt_dir"/sources.list.d/*.list "$apt_dir"/sources.list.d/*.sources; do
+		[[ -f "$file" ]] || continue
+		grep -q 'deb\.xanmod\.org' "$file" || continue
+		tmp=$(mktemp) || return 1
+		if [[ "$file" == *.sources ]]; then
+			awk 'BEGIN { RS=""; ORS="\n\n" }
+			{
+				n=split($0, lines, "\n"); block=""; keep=1
+				for (i=1; i<=n; i++) {
+					line=lines[i]
+					if (line ~ /^URIs:/) {
+						while (i<n && lines[i+1] ~ /^[[:space:]]/)
+							line=line " " lines[++i]
+						m=split(line, uris, /[[:space:]]+/); line="URIs:"
+						for (j=2; j<=m; j++)
+							if (uris[j] !~ /^https?:\/\/deb\.xanmod\.org(\/|$)/)
+								line=line " " uris[j]
+						if (line == "URIs:") keep=0
+					}
+					block=block (block != "" ? "\n" : "") line
+				}
+				if (keep) print block
+			}' "$file" >"$tmp"
+		else
+			awk '!/^[[:space:]]*deb(-src)?[[:space:]].*https?:\/\/deb\.xanmod\.org(\/|[[:space:]]|$)/' "$file" >"$tmp"
+		fi
+		if [[ $? -ne 0 ]] || ! cat "$tmp" >"$file"; then
+			rm -f "$tmp"
+			return 1
+		fi
+		rm -f "$tmp"
+	done
+}
+
 # 统一 Xanmod 安装引擎
 install_xanmod_generic() {
 	local edition="$1" # main, lts, edge, rt
@@ -2771,18 +2829,12 @@ install_xanmod_generic() {
 		return 1
 	}
 
-	apt update
-	apt-get install gnupg gnupg2 gnupg1 wget -y
-
-	# 清除可能存在的旧版或重复源 (兼容 PR 提到的 .sources 与冲突问题)
-	rm -f /etc/apt/sources.list.d/xanmod-kernel.list
-	rm -f /etc/apt/sources.list.d/xanmod-release.list
-	rm -f /etc/apt/sources.list.d/xanmod-kernel.sources
-	sed -i '/deb.xanmod.org/d' /etc/apt/sources.list 2>/dev/null
-
-	# 使用现代化的 signed-by 格式写入 GPG 密钥与源，彻底消除 apt 警告
-	wget -qO - https://dl.xanmod.org/gpg.key | gpg --dearmor --yes -o /usr/share/keyrings/xanmod-archive-keyring.gpg
-	echo 'deb [signed-by=/usr/share/keyrings/xanmod-archive-keyring.gpg] http://deb.xanmod.org releases main' | tee /etc/apt/sources.list.d/xanmod-kernel.list
+	local suite
+	suite=$(resolve_xanmod_suite) || return 1
+	# 先移除 releases 等失效条目，否则第一次 apt-get update 就会失败。
+	remove_xanmod_sources || return 1
+	apt-get update -o APT::Update::Error-Mode=any || return 1
+	apt-get install -y gnupg ca-certificates wget || return 1
 
 	# 在临时目录下载并运行 CPU 支持等级检测脚本，避免污染调用方 CWD
 	local xanmod_work
@@ -2795,6 +2847,15 @@ install_xanmod_generic() {
 		echo -e "${ERROR} 无法进入临时目录！"
 		return 1
 	}
+
+	# 使用官网当前的 archive.key；下载和转换分别校验，失败时不写入新源。
+	if ! wget -qO archive.key https://dl.xanmod.org/archive.key ||
+		! gpg --dearmor --yes -o xanmod-archive-keyring.gpg archive.key; then
+		echo -e "${ERROR} XanMod 签名密钥获取失败，已中止安装。"
+		return 1
+	fi
+	install -m 644 xanmod-archive-keyring.gpg /usr/share/keyrings/xanmod-archive-keyring.gpg || return 1
+	printf 'deb [signed-by=/usr/share/keyrings/xanmod-archive-keyring.gpg] https://deb.xanmod.org %s main\n' "$suite" > /etc/apt/sources.list.d/xanmod-kernel.list || return 1
 
 	local cpu_level="1"
 	if wget -qO check_x86-64_psabi.sh https://dl.xanmod.org/check_x86-64_psabi.sh 2>/dev/null &&
@@ -2809,19 +2870,27 @@ install_xanmod_generic() {
 	fi
 	echo -e "${INFO} CPU 支持等级: \033[32mv${cpu_level}\033[0m"
 
-	apt update
+	apt-get update -o APT::Update::Error-Mode=any || return 1
 	local pkg_name="linux-xanmod"
 	[[ "$edition" != "main" ]] && pkg_name="linux-xanmod-${edition}"
 
 	if [[ "$cpu_level" -ge 3 ]]; then
-		apt install "${pkg_name}-x64v3" -y
+		pkg_name="${pkg_name}-x64v3"
 	elif [[ "$cpu_level" -ge 2 ]]; then
-		apt install "${pkg_name}-x64v2" -y
+		pkg_name="${pkg_name}-x64v2"
 	else
-		apt install "${pkg_name}-x64v1" -y
+		pkg_name="${pkg_name}-x64v1"
 	fi
+	# MAIN/EDGE/RT 不再提供 v1；oldstable 可能只提供 LTS。交由 APT 验证当前候选。
+	local candidate
+	candidate=$(LC_ALL=C apt-cache policy "$pkg_name" | awk '/Candidate:/ {print $2; exit}')
+	if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
+		echo -e "${ERROR} 当前系统/CPU 无可用的 ${pkg_name}，可尝试 XanMod LTS 或官方内核。"
+		return 1
+	fi
+	apt-get install -y "$pkg_name" || return 1
 
-	BBR_grub
+	BBR_grub || return 1
 	echo -e "${TIP} 内核安装完毕。"
 }
 
@@ -2983,6 +3052,9 @@ check_status() {
 # =================================================
 
 # 系统检测与镜像测速 (两种入口共用，只跑一次)
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+	return 0
+fi
 check_sys
 check_cn_status
 

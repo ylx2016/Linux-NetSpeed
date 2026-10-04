@@ -20,6 +20,15 @@ bash <(curl -fsSL https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/maste
   - `./tcpx.sh op3` → 对应菜单 `38`
 - 关联 GitHub Actions 自动编译内核：<https://github.com/ylx2016/kernel/>
 
+### XanMod 软件源
+
+菜单 `9`～`12` 使用当前发行版代号配置 XanMod 源，例如 Debian 13 使用 `trixie`，Ubuntu 24.04 使用 `noble`。Ubuntu 衍生版优先使用自己的代号；上游未提供该代号时，尝试 `UBUNTU_CODENAME` 对应的源。
+
+旧版脚本配置的 `deb.xanmod.org releases` 已失效，会出现 `Release 404`。重新运行新版脚本中的 XanMod 安装选项即可迁移旧源，支持 `.list` 和 deb822 `.sources`，并保留文件中的其他仓库。软件源、签名密钥或软件包安装失败时，脚本会停止，不再提示安装完成。
+
+可用内核取决于 XanMod 上游和 CPU 等级：旧稳定版和仅支持 x86-64-v1 的 CPU 可尝试 LTS。上游安装说明：<https://xanmod.org/#apt_repository>。
+
+回归测试使用隔离文件系统和模拟命令，不安装内核：安装 `bubblewrap` 后，在仓库目录运行 `bash tests/xanmod.sh`。
 
 ## BBR + 锐速 双开
 
@@ -120,5 +129,4 @@ ylx2016 与 chiakge、cx9208 无任何关系。
 - [agentrouter](https://agentrouter.org/register?aff=d3mq)
 
 相关工具：[搬瓦工在线库存查询](https://bwg.ylx.me/)
-
 
