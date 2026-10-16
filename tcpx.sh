@@ -6,7 +6,7 @@ export PATH
 # =================================================
 #  全局配置区 (Configuration as Data)
 # =================================================
-readonly SH_VER="100.0.6.9"
+readonly SH_VER="100.0.6.10"
 readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 # 内核二进制 (bbr/bbrplus/lotserver) 已从仓库迁移到 Release，按目录整包托管，避免仓库臃肿。
 readonly KERNEL_RELEASE_BASE="https://github.com/ylx2016/Linux-NetSpeed/releases/download/kernels"
@@ -372,15 +372,55 @@ safe_wget() {
 	return 1
 }
 
+# 4. 从候选链接中挑出版本号最高的一条 (get_github_asset 的收尾步骤)
+# GitHub 的 /releases 接口是按 created_at 倒序返回的，不是按版本号倒序，两者并不等价：
+#   - 同一仓库中多个 release 的 created 时间可能完全相同 —— ylx2016/kernel 的所有
+#     *Kernel_Cloud* tag 都是 2026-09-03T10:37:26Z (只有更新的 assets 才会动 updated_at)。
+#     此时接口返回顺序对该仓库而言是任意的：实测 7.2.9 排在 7.2.10 / 7.2.11 之前。
+#   - 因此取 head -n 1 得到的既不是"最新发布"也不是"最高版本"，而是列表里恰好靠前的
+#     那一条 —— 菜单 1「安装最新自编译内核」装出 7.2.9 就是这么来的。
+# 故此处改为按文件名里的版本号排序取最大值，与接口返回顺序彻底解耦。
+pick_latest_asset() {
+	# stdin: 每行一个候选 URL；stdout: 版本号最高的一条 (无法比较版本时才退回第一条)
+	local url base ver line
+	local unversioned=""
+	local versioned=()
+	while IFS= read -r url; do
+		[[ -z "$url" ]] && continue
+		base="${url##*/}"
+		# 文件名中第一个 N.N.N 即内核版本，形如:
+		#   linux-image-7.2.11_7.2.11-2_amd64.deb
+		#   CentOS-7_Required_kernel-6.7.9-bbrplus.el7.x86_64.rpm
+		# 这与下方安装时用来展示版本号的正则完全一致，保证"显示的"就是"选中的"。
+		# 注意不能取文件名中最大的数字段: el7.x86_64 里的 86 会盖过 6.7.9。
+		ver=$(printf '%s\n' "$base" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+		if [[ -z "$ver" ]]; then
+			[[ -z "$unversioned" ]] && unversioned="$url"
+			continue
+		fi
+		versioned+=("${ver} ${url}")
+	done
+
+	if [[ ${#versioned[@]} -eq 0 ]]; then
+		printf '%s\n' "$unversioned"
+		return 0
+	fi
+	# 按第 1 字段(版本号)做版本序排序后取末行；URL 中不含空格，按首个空格切回原文无误。
+	printf '%s\n' "${versioned[@]}" | sort -V -k1,1 | tail -n 1 | sed 's/^[^ ]* //'
+}
+
 # 3. 稳健的 GitHub 资源获取函数 (用 grep 从 JSON 提取下载直链，再通过 grep 多重过滤)
-# 用法: get_github_asset <仓库名> <Tag关键词> <文件名关键词>
+# 用法: get_github_asset <仓库名> <Tag关键词> <文件名关键词> [架构关键词]
 # 示例: get_github_asset "ylx2016/kernel" "Debian_Kernel" "headers"
+# 多个候选命中时返回版本号最高的一个 (见 pick_latest_asset)
 get_github_asset() {
 	local repo="$1"
 	local tag_kw="$2"
 	local ast_kw="$3"
 	local arch_kw="$4" # 可选的架构关键词
-	local api_url="https://api.github.com/repos/${repo}/releases"
+	# per_page=100: 默认只返回 30 个 release，一旦上游 tag 变多，老候选会被截断；
+	# 本脚本永远只关心"最高版本"，取满一页即可，无需翻页。
+	local api_url="https://api.github.com/repos/${repo}/releases?per_page=100"
 
 	local response=$(curl -sL --max-time 10 "$api_url")
 	if echo "$response" | grep -q "API rate limit exceeded"; then
@@ -411,7 +451,8 @@ get_github_asset() {
 		result=$(echo "$result" | grep -viE "arm64|aarch64")
 	fi
 
-	local asset_url=$(echo "$result" | head -n 1)
+	# 候选可能有多条 (同一仓库的多个版本)，取版本号最高的那条
+	local asset_url=$(echo "$result" | pick_latest_asset)
 
 	if [[ -z "$asset_url" ]]; then
 		echo -e "${ERROR} 无法在 ${repo} 中解析到匹配关键字 (${tag_kw} -> ${ast_kw} -> ${arch_kw}) 的文件！" >&2
