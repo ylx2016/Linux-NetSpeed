@@ -6,11 +6,11 @@ export PATH
 # =================================================
 #  全局配置区 (Configuration as Data)
 # =================================================
-readonly SH_VER="100.0.6.10"
+readonly SH_VER="100.0.6.11"
 readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 # 内核二进制 (bbr/bbrplus/lotserver) 已从仓库迁移到 Release，按目录整包托管，避免仓库臃肿。
 readonly KERNEL_RELEASE_BASE="https://github.com/ylx2016/Linux-NetSpeed/releases/download/kernels"
-readonly CLOUD_STATE_FILE="/etc/tcpx_cloud_lastver" # installcloud 记忆上次探测到的最高可安装 Cloud 内核
+readonly CLOUD_STATE_FILE="/etc/tcpx_cloud_lastver"                        # installcloud 记忆上次探测到的最高可安装 Cloud 内核
 readonly CLOUD_HDR_POOL="https://deb.debian.org/debian/pool/main/l/linux/" # Cloud 内核 headers (arch/-common/kbuild) 所在 pool
 
 # 自安装：把脚本落地到 /usr/local/bin/tcpx，安装后可直接输入 tcpx 运行。
@@ -698,15 +698,16 @@ resolve_cloud_header_debs() {
 	local abi base
 	abi=$(echo "$img_file" | sed -nE "s/^linux-image-(.*-cloud-${debarch})_.*/\1/p")
 	[[ -z "$abi" ]] && return 1
-	base="${abi%-cloud-${debarch}}"   # 6.17.13+deb13-cloud-amd64 -> 6.17.13+deb13
+	base="${abi%-cloud-${debarch}}" # 6.17.13+deb13-cloud-amd64 -> 6.17.13+deb13
 
 	# 先用 arch 专属 headers 定位版本号，再据此锁定同版本 common / kbuild，避免版本错配
 	local arch_hdr ver
 	arch_hdr=$(printf '%s\n' "$listing" | while read -r f; do
-		case "$f" in "linux-headers-${abi}_"*"_${debarch}.deb") echo "$f";; esac
+		case "$f" in "linux-headers-${abi}_"*"_${debarch}.deb") echo "$f" ;; esac
 	done | sort -V | tail -n 1)
 	[[ -z "$arch_hdr" ]] && return 1
-	ver="${arch_hdr#linux-headers-${abi}_}"; ver="${ver%_${debarch}.deb}"
+	ver="${arch_hdr#linux-headers-${abi}_}"
+	ver="${ver%_${debarch}.deb}"
 
 	echo "$arch_hdr"
 	local common_hdr="linux-headers-${base}-common_${ver}_all.deb"
@@ -729,7 +730,7 @@ check_cloud_headers_installable() {
 		[[ -z "$hf" ]] && continue
 		safe_wget "${CLOUD_HDR_POOL}${hf}" "${scan_dir}/${hf}" >/dev/null 2>&1 || return 1
 		debs+=("${scan_dir}/${hf}")
-	done <<< "$hdr_files"
+	done <<<"$hdr_files"
 	[[ ${#debs[@]} -eq 0 ]] && return 1
 
 	local log
@@ -757,7 +758,7 @@ CLOUD_MAX_IDX=-1
 CLOUD_MAX_FILE=""
 detect_cloud_max() {
 	local img_url_base="$1"
-	local need_headers="$2"   # 1 = 同时要求配套 headers 依赖也可满足
+	local need_headers="$2" # 1 = 同时要求配套 headers 依赖也可满足
 	local debarch="$3"
 	shift 3
 	local versions_array=("$@")
@@ -881,12 +882,15 @@ ensure_cloud_headers() {
 
 	# 下载三件套到临时目录，一次性 apt 离线安装 (依赖自洽，无需启用 backports 源)
 	local work_dir debs=() f
-	work_dir=$(mktemp -d /tmp/cloud_hdr.XXXXXX) || { echo -e "${TIP} 无法创建临时目录，已跳过 headers。"; return 0; }
+	work_dir=$(mktemp -d /tmp/cloud_hdr.XXXXXX) || {
+		echo -e "${TIP} 无法创建临时目录，已跳过 headers。"
+		return 0
+	}
 	chmod 755 "$work_dir"
 	while read -r f; do
 		[[ -z "$f" ]] && continue
 		safe_wget "${CLOUD_HDR_POOL}${f}" "${work_dir}/${f}" && debs+=("${work_dir}/${f}")
-	done <<< "$hdr_files"
+	done <<<"$hdr_files"
 
 	local apt_out rc=1
 	if [[ ${#debs[@]} -gt 0 ]]; then
@@ -1192,6 +1196,129 @@ ask_workload_profile() {
 	esac
 }
 
+# IPv6 转发与 SLAAC 共存：保留原 RA 策略，只把“作为主机接收”(1)提升为“转发时也接收”(2)。
+# 不根据默认路由猜网卡（故障后路由可能已经消失），不修改 all.accept_ra（它不会广播到接口）。
+# 显式 0 也要逐接口持久化，否则重启时可能继承 default=2，意外打开 RA。
+render_ipv6_ra_config() {
+	[[ -d /proc/sys/net/ipv6/conf ]] || return 0
+	local ra_file iface ra config=""
+	for ra_file in /proc/sys/net/ipv6/conf/*/accept_ra; do
+		[[ -f "$ra_file" ]] || continue
+		iface=${ra_file%/accept_ra}
+		iface=${iface##*/}
+		case "$iface" in all | lo) continue ;; esac
+		if [[ ! "$iface" =~ ^[a-zA-Z0-9_.:-]+$ ]]; then
+			echo -e "${ERROR} 网卡名 ${iface} 无法安全写入 sysctl 配置，已停止修改。" >&2
+			return 1
+		fi
+		if ! read -r ra <"$ra_file" || [[ ! "$ra" =~ ^[012]$ ]]; then
+			echo -e "${ERROR} 无法读取 ${iface} 的 accept_ra，已停止修改，避免破坏 IPv6。" >&2
+			return 1
+		fi
+		[[ "$ra" == "1" ]] && ra=2
+		# 斜杠形式保留 ens3.100 等接口名里的点。不能加前导 -，旧 systemd/procps 不识别。
+		printf -v config '%snet/ipv6/conf/%s/accept_ra = %s\n' "$config" "$iface" "$ra"
+	done
+	[[ -n "$config" ]] || return 0
+	printf '# BEGIN TCPX IPv6 RA\n# 1→2 兼容转发；0 保留禁用/用户态 RA。自定义覆盖请写在本块之后。\n%s# END TCPX IPv6 RA\n' "$config"
+}
+
+# 旧安装迁移：仅在 tcpx 自己的配置启用了 IPv6 全局转发时补齐 RA。
+# 自动迁移一次；菜单 [39] 可按当前策略刷新。块放在前面，不盖掉用户在原文件里的显式设置。
+ensure_ipv6_ra_config() {
+	local conf="/etc/sysctl.d/99-sysctl.conf" ra_config tmp
+	[[ -f "$conf" ]] || return 0
+	# 保留管理员的符号链接关系；临时文件、备份和原子替换都落在真实目标旁。
+	conf=$(readlink -f -- "$conf") || {
+		echo -e "${ERROR} 无法解析 sysctl 配置真实路径，本次不修改或应用。" >&2
+		return 1
+	}
+	grep -Eq '^[[:space:]]*net\.ipv6\.conf\.all\.forwarding[[:space:]]*=[[:space:]]*1([[:space:]#;]|$)' "$conf" || return 0
+	# 同时校验配对、顺序及重复；只数 BEGIN/END 个数会在倒序时截掉用户配置。
+	if ! awk '
+		/^# BEGIN TCPX IPv6 RA[[:space:]]*$/ {if (seen) bad=1; seen=1; inside=1}
+		/^# END TCPX IPv6 RA[[:space:]]*$/ {if (!inside) bad=1; inside=0}
+		END {exit (bad || inside)}' "$conf"; then
+		echo -e "${ERROR} ${conf} 的 IPv6 RA 标记块损坏，请先检查文件；本次不应用转发参数。" >&2
+		return 1
+	fi
+	if [[ "${1:-}" != "refresh" ]] && grep -Eq '^# BEGIN TCPX IPv6 RA[[:space:]]*$' "$conf"; then
+		return 0
+	fi
+	ra_config=$(render_ipv6_ra_config) || return 1
+	[[ -n "$ra_config" ]] || return 0
+	tmp=$(mktemp "${conf}.ipv6-ra.XXXXXX") || {
+		echo -e "${ERROR} 无法创建 IPv6 RA 配置临时文件，本次不应用转发参数。" >&2
+		return 1
+	}
+	if ! {
+		printf '%s\n' "$ra_config" >"$tmp" &&
+			awk '/^# BEGIN TCPX IPv6 RA[[:space:]]*$/ {skip=1; next} /^# END TCPX IPv6 RA[[:space:]]*$/ {skip=0; next} !skip' "$conf" >>"$tmp" &&
+			chown --reference="$conf" "$tmp" && chmod --reference="$conf" "$tmp" &&
+			{ [[ -e "${conf}.before-ipv6-ra.bak" ]] || cp -p "$conf" "${conf}.before-ipv6-ra.bak"; } &&
+			mv -f "$tmp" "$conf"
+	}; then
+		rm -f "$tmp"
+		echo -e "${ERROR} IPv6 RA 配置写入失败，本次不应用转发参数。" >&2
+		return 1
+	fi
+	echo -e "${INFO} 已补齐 IPv6 RA 兼容配置（保留 forwarding 和显式 RA=0），原配置备份: ${conf}.before-ipv6-ra.bak" >&2
+}
+
+# 检查实际接口，不能用 all.accept_ra 或 sysctl 的退出码代替。
+# RA=0 可能属于 networkd/NM 用户态 RA，不能强制开启；也不擅自改 autoconf/IPv6 开关。
+check_ipv6_ra() {
+	local ra_file iface ra forwarding disabled status=0
+	for ra_file in /proc/sys/net/ipv6/conf/*/accept_ra; do
+		[[ -f "$ra_file" ]] || continue
+		iface=${ra_file%/accept_ra}
+		case "${iface##*/}" in all | lo) continue ;; esac
+		read -r ra <"$ra_file" || continue
+		read -r forwarding <"$iface/forwarding" || continue
+		read -r disabled <"$iface/disable_ipv6" || continue
+		if [[ "$disabled" == "0" && "$forwarding" == "1" && "$ra" == "1" ]]; then
+			echo -e "${TIP} ${iface##*/}: forwarding=1、accept_ra=1，内核不会接收 RA；请检查其它 sysctl/网络管理器的覆盖（菜单 [39] 可修复旧配置）。" >&2
+			status=1
+		fi
+	done
+	return "$status"
+}
+
+# 所有脚本内的 sysctl 重载共用此入口：先迁移旧配置，再应用，最后检查实际 RA 状态。
+# stdout 仍可由调用方隐藏，但不能再把错误和 IPv6 冲突一起吞掉。
+apply_sysctl() {
+	ensure_ipv6_ra_config || return 1
+	local status=0
+	# -e 只容忍不存在的键（如尚未创建的网卡），权限/值错误仍会报出；兼容旧 procps。
+	sysctl -e --system || status=$?
+	# 未使用 tcpx 转发优化的路由器可能有意靠 RA=1 拒收 RA，不能因切 BBR 而干预它。
+	if [[ -f /etc/sysctl.d/99-sysctl.conf ]] && grep -Eq '^# BEGIN TCPX IPv6 RA[[:space:]]*$' /etc/sysctl.d/99-sysctl.conf; then
+		check_ipv6_ra || status=1
+	fi
+	return "$status"
+}
+
+repair_ipv6_ra() {
+	if [[ ! -f /etc/sysctl.d/99-sysctl.conf ]]; then
+		echo -e "${TIP} 未找到 tcpx 的 sysctl 配置，无需迁移。"
+		return 0
+	fi
+	ensure_ipv6_ra_config refresh || return 1
+	apply_sysctl >/dev/null || return 1
+	echo -e "${INFO} IPv6 RA 配置已检查并应用；未关闭转发，也未重启网络。"
+	echo -e "${TIP} RA=0 的接口保持原策略（可能由 networkd/NetworkManager 接管）；本操作不强行启用 IPv6 或地址自动配置。"
+	if command -v ip >/dev/null 2>&1; then
+		local addresses routes
+		addresses=$(ip -6 addr show scope global)
+		routes=$(ip -6 route show default)
+		printf '\nIPv6 全局地址:\n%s\nIPv6 默认路由:\n%s\n' "${addresses:-（暂无）}" "${routes:-（暂无）}"
+		if [[ -z "$addresses" || -z "$routes" ]]; then
+			echo -e "${TIP} 尚未确认 IPv6 连通性；若本机依赖 SLAAC，请等待新的 RA，或用 rdisc6 <公网网卡> 主动请求。" >&2
+			echo -e "${TIP} 若仍不恢复，请核对网络管理器的 RA 配置及 ICMPv6；不要在唯一的 SSH 会话中直接重启网络。" >&2
+		fi
+	fi
+}
+
 # =================================================
 #  系统级网络与资源自适应优化 (替换旧版优化)
 # =================================================
@@ -1284,6 +1411,10 @@ optimizing_system() {
 	local netdev_budget=$((300 + 20 * cpu_cores))
 	[[ $netdev_budget -gt 50000 ]] && netdev_budget=50000
 
+	# 在清空旧文件、开启转发之前保存接口 RA 策略；读取失败时不继续写配置。
+	local ra_config
+	ra_config=$(render_ipv6_ra_config) || return 1
+
 	# 4. 生成统一的 sysctl 配置文件
 	local sysctl_conf="/etc/sysctl.d/99-sysctl.conf"
 
@@ -1349,6 +1480,8 @@ net.ipv4.ip_local_port_range = 1024 65535
 # 引发端口复用异常与 RST。配合 tcp_tw_reuse=1，取一个更从容的值。
 net.ipv4.tcp_max_tw_buckets = 55000
 net.ipv4.tcp_fastopen = 3
+
+$ra_config
 
 # --- 路由转发 (默认全开，兼容 Docker/Tailscale/WireGuard 等；route_localnet 已按安全建议移除) ---
 net.ipv4.ip_forward = 1
@@ -1450,7 +1583,7 @@ EOF
 	echo -e "${INFO} 正在应用自适应内核配置..."
 	# sysctl --system 会按序加载 /etc/sysctl.d/ 下全部文件(含本文件)，
 	# 前面单独的 sysctl -p "$sysctl_conf" 属于重复执行，已移除。
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 
 	# 透明大页设为 madvise: 仅对显式 madvise(MADV_HUGEPAGE) 的程序启用大页。
 	# 相比 always，可避免 Redis/数据库等延迟敏感服务因大页整理(khugepaged)
@@ -1542,6 +1675,9 @@ disable_tcpfit_shaper_force() {
 
 # 卸载加速器 (清理配置)
 remove_bbr_lotserver() {
+	local apply_status=0
+	# 清理算法行之前迁移，备份才是修改前的完整配置；失败时不继续重载旧转发设置。
+	ensure_ipv6_ra_config || return 1
 	echo -e "${INFO} 正在清理旧的拥塞控制与队列算法配置..."
 	# 三处都清: 主文件、传统 /etc/sysctl.conf、以及 tcpfit 共存时用的高优先级 drop-in，
 	# 避免切换算法后残留旧行 (drop-in 排序最靠后，残留会覆盖新选择)。
@@ -1551,7 +1687,11 @@ remove_bbr_lotserver() {
 		[[ -f "$f" ]] && sed -i '/net.core.default_qdisc/d; /net.ipv4.tcp_congestion_control/d; /net\.ipv4\.tcp_ecn[[:space:]]*=/d' "$f"
 	done
 
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || apply_status=$?
+	# 切算法时失败即停止；彻底卸载时仍须停服务/卸模块，不能留下运行中的加速器。
+	if [[ "$apply_status" -ne 0 && "${1:-}" != "cleanup" ]]; then
+		return "$apply_status"
+	fi
 
 	# 停用 LotSpeed 开机自启服务：切换到 BBR/锐速 等其它算法时若不取消它，
 	# 重启后 lotspeed-boot.service 会重新加载模块并把算法顶回 lotspeed，
@@ -1576,6 +1716,7 @@ remove_bbr_lotserver() {
 		fi
 		rm -f "$tmp_lot"
 	fi
+	return "$apply_status"
 }
 
 # 确保 qdisc 对应的 sch_ 模块已加载并在重启后自动加载。
@@ -1600,7 +1741,7 @@ enable_acceleration() {
 	prev_ecn=$(cat /proc/sys/net/ipv4/tcp_ecn 2>/dev/null)
 	[[ ! "$prev_ecn" =~ ^[0-2]$ ]] && prev_ecn=""
 
-	remove_bbr_lotserver
+	remove_bbr_lotserver || return 1
 	maybe_offer_disable_tcpfit_shaper
 
 	echo -e "${INFO} 正在应用: ${cc} + ${qdisc} ..."
@@ -1616,13 +1757,13 @@ enable_acceleration() {
 	# 保留切换前的 ECN 设置
 	[[ -n "$prev_ecn" ]] && echo "net.ipv4.tcp_ecn=$prev_ecn" >>"$sysctl_conf"
 
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 	echo -e "${INFO} 加速算法修改成功！如果未立即生效，请重启服务器。"
 }
 
 # 启用 Lotserver
 startlotserver() {
-	remove_bbr_lotserver
+	remove_bbr_lotserver || return 1
 	maybe_offer_disable_tcpfit_shaper
 	if [[ "${OS_TYPE}" == "CentOS" ]]; then
 		yum install ethtool -y
@@ -1658,7 +1799,7 @@ set_ecn() {
 	# 收尾锚定 [[:space:]]*=，只删 tcp_ecn 本身，不误伤 tcp_ecn_fallback
 	sed -i '/net\.ipv4\.tcp_ecn[[:space:]]*=/d' /etc/sysctl.d/99-sysctl.conf /etc/sysctl.conf "$TCPX_ACCEL_DROPIN" 2>/dev/null
 	echo "net.ipv4.tcp_ecn=$status" >>"$sysctl_conf"
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 	[[ "$status" == "1" ]] && echo -e "${INFO} ECN 已开启！" || echo -e "${INFO} ECN 已关闭！"
 }
 
@@ -1678,7 +1819,8 @@ _tcpfit_manual_restore() {
 	if [[ -f "$snap" ]]; then
 		# 快照行形如 "net.core.rmem_max = 212992"，按第一个 = 拆分后逐项回写
 		grep -E '^(net|vm|fs)\.' "$snap" | while IFS='=' read -r _k _v; do
-			_k=$(echo "$_k" | xargs); _v=$(echo "$_v" | xargs)
+			_k=$(echo "$_k" | xargs)
+			_v=$(echo "$_v" | xargs)
 			[[ -n "$_k" && -n "$_v" ]] && sysctl -qw "$_k=$_v" 2>/dev/null
 		done
 		echo -e "${INFO} 已按 tcpfit 快照还原 sysctl。"
@@ -1726,17 +1868,19 @@ remove_tcpfit_full() {
 	rm -rf /var/lib/nettune
 
 	systemctl daemon-reload >/dev/null 2>&1
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 	echo -e "${INFO} tcpfit 已还原并清理完成。"
 }
 
 # 彻底卸载全部加速与优化 (抛弃几十个 sed 删除，直接清空文件)
 remove_all() {
+	local apply_status=0
 	echo -e "${INFO} 正在清空网络优化与系统限制..."
 	rm -f /etc/sysctl.d/99-sysctl.conf
 	rm -f "$TCPX_ACCEL_DROPIN"
 	cat /dev/null >/etc/sysctl.conf
-	sysctl --system >/dev/null 2>&1
+	# 卸载即使遇到其它配置的载入错误，也继续清理服务和资源限制。
+	apply_sysctl >/dev/null || apply_status=$?
 
 	# 逐个文件加存在性守卫：如 /etc/pam.d/common-session 在 CentOS 上并不存在，
 	# 无守卫的 sed -i 会打印 "No such file" 噪声错误。
@@ -1746,7 +1890,7 @@ remove_all() {
 	[[ -f /etc/pam.d/common-session ]] && sed -i '/required pam_limits.so/d' /etc/pam.d/common-session
 
 	systemctl daemon-reload
-	remove_bbr_lotserver
+	remove_bbr_lotserver cleanup || apply_status=$?
 	# 新增：彻底卸载时，物理清理 LotSpeed 残留文件
 	rm -f /usr/local/bin/lotspeed
 	rm -rf /opt/lotspeed
@@ -1775,6 +1919,10 @@ remove_all() {
 		else
 			echo -e "${INFO} 已保留 tcpfit。如需彻底还原请执行: tcpfit rollback (加 --purge-swap 连 swap 一并撤销)。"
 		fi
+	fi
+	if [[ "$apply_status" -ne 0 ]]; then
+		echo -e "${TIP} 已继续清理加速器和优化文件，但 sysctl 重载有错误，请按上方输出检查其它配置。" >&2
+		return "$apply_status"
 	fi
 	echo -e "${INFO} 系统已恢复原生状态。"
 }
@@ -2021,7 +2169,7 @@ After=network.target
 [Service]
 Type=oneshot
 ExecStart=${lotspeed_bin} start
-ExecStartPost=${sysctl_bin} --system
+ExecStartPost=${sysctl_bin} -e --system
 RemainAfterExit=yes
 
 [Install]
@@ -2058,7 +2206,7 @@ install_lotspeed() {
 		sysctl_conf=$(accel_conf_path)
 		sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.d/99-sysctl.conf /etc/sysctl.conf "$TCPX_ACCEL_DROPIN" 2>/dev/null
 		echo "net.ipv4.tcp_congestion_control=lotspeed" >>"$sysctl_conf"
-		sysctl --system >/dev/null 2>&1
+		apply_sysctl >/dev/null || return 1
 		echo -e "${INFO} LotSpeed 已设置为默认拥塞控制算法！"
 		setup_lotspeed_boot_service
 		disable_tcpfit_shaper_force
@@ -2074,7 +2222,7 @@ enable_lotspeed_standalone() {
 		sleep 3
 		return
 	fi
-	remove_bbr_lotserver
+	remove_bbr_lotserver || return 1
 	disable_tcpfit_shaper_force
 	echo -e "${INFO} 正在启动 LotSpeed 加速..."
 	lotspeed start >/dev/null 2>&1
@@ -2086,7 +2234,7 @@ enable_lotspeed_standalone() {
 	sed -i '/net.ipv4.tcp_congestion_control/d; /net.core.default_qdisc/d' /etc/sysctl.d/99-sysctl.conf /etc/sysctl.conf "$TCPX_ACCEL_DROPIN" 2>/dev/null
 	echo "net.core.default_qdisc=fq" >>"$sysctl_conf"
 	echo "net.ipv4.tcp_congestion_control=lotspeed" >>"$sysctl_conf"
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 
 	# remove_bbr_lotserver 已先禁用旧的开机服务，此处按当前 LotSpeed 状态重新启用
 	setup_lotspeed_boot_service
@@ -2304,7 +2452,7 @@ closeipv6() {
 	sed -i '/net.ipv6.conf.all.disable_ipv6/d; /net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf /etc/sysctl.conf 2>/dev/null
 	echo "net.ipv6.conf.all.disable_ipv6 = 1" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv6.conf.default.disable_ipv6 = 1" >>/etc/sysctl.d/99-sysctl.conf
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 	echo -e "${INFO} IPv6 已成功禁用！"
 }
 
@@ -2313,7 +2461,7 @@ openipv6() {
 	sed -i '/net.ipv6.conf.all.disable_ipv6/d; /net.ipv6.conf.default.disable_ipv6/d' /etc/sysctl.d/99-sysctl.conf /etc/sysctl.conf 2>/dev/null
 	echo "net.ipv6.conf.all.disable_ipv6 = 0" >>/etc/sysctl.d/99-sysctl.conf
 	echo "net.ipv6.conf.default.disable_ipv6 = 0" >>/etc/sysctl.d/99-sysctl.conf
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 	echo -e "${INFO} IPv6 已成功开启！"
 }
 
@@ -2326,7 +2474,7 @@ net.ipv4.tcp_syncookies = 1
 net.ipv4.tcp_max_syn_backlog = 1024000
 net.ipv4.tcp_synack_retries = 1
 EOF
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 	echo -e "${INFO} 防 CC 基础参数已写入并生效！"
 }
 
@@ -2383,6 +2531,7 @@ show_menu_panel() {
  ${GREEN_FONT_PREFIX}32.${FONT_COLOR_SUFFIX} 系统网络自适应优化      ${GREEN_FONT_PREFIX}33.${FONT_COLOR_SUFFIX} 防CC/DDOS轻量优化
  ${GREEN_FONT_PREFIX}35.${FONT_COLOR_SUFFIX} 禁用IPv6                ${GREEN_FONT_PREFIX}36.${FONT_COLOR_SUFFIX} 开启IPv6
  ${GREEN_FONT_PREFIX}37.${FONT_COLOR_SUFFIX} 手动提交合并内核参数    ${GREEN_FONT_PREFIX}38.${FONT_COLOR_SUFFIX} 手动编辑内核参数
+ ${GREEN_FONT_PREFIX}39.${FONT_COLOR_SUFFIX} 修复IPv6 RA/SLAAC（保留转发）
  ———————————————————————————— 内核管理 —————————————————————————————
  ${GREEN_FONT_PREFIX}51.${FONT_COLOR_SUFFIX} 查看排序内核            ${GREEN_FONT_PREFIX}52.${FONT_COLOR_SUFFIX} 删除保留指定内核
  ${GREEN_FONT_PREFIX}55.${FONT_COLOR_SUFFIX} 卸载全部加速            ${GREEN_FONT_PREFIX}99.${FONT_COLOR_SUFFIX} 退出脚本
@@ -2450,6 +2599,7 @@ start_menu() {
 		36) openipv6 ;;
 		37) update_sysctl_interactive ;;
 		38) edit_sysctl_interactive ;;
+		39) repair_ipv6_ra ;;
 		51) show_kernels ;;
 		52) delete_kernel_custom ;;
 		55) remove_all ;;
@@ -2608,7 +2758,7 @@ update_sysctl_interactive() {
 	log_info "正在应用新的 sysctl 设置..."
 	# 与脚本其余部分统一使用 sysctl --system，按 /etc/sysctl.d/ 的优先级顺序
 	# 加载全部配置文件，得到与重启后一致的最终合并结果。
-	if apply_output=$(sysctl --system 2>&1); then
+	if apply_output=$(apply_sysctl 2>&1); then
 		log_info "Sysctl 设置已成功应用。"
 		echo "--- 应用输出 ---"
 		echo "$apply_output"
@@ -2632,7 +2782,7 @@ update_sysctl_interactive() {
 
 			mv "$BACKUP_FILE" "$CONF_FILE"
 			log_info "正在恢复到之前的设置..."
-			sysctl --system >/dev/null 2>&1
+			apply_sysctl >/dev/null
 
 			log_error "回滚完成。配置文件已恢复，问题备份文件保留在 $BACKUP_FILE"
 			return 1
@@ -2691,7 +2841,7 @@ edit_sysctl_interactive() {
 	echo ""
 	echo -e "${INFO} 正在应用新配置..."
 	# sysctl --system 加载 /etc/sysctl.d/ 全部文件，比 sysctl -p 单文件更完整
-	sysctl --system >/dev/null 2>&1
+	apply_sysctl >/dev/null || return 1
 	echo -e "${INFO} 内核参数已重载。部分参数需重启后才能生效。"
 }
 
@@ -3045,6 +3195,10 @@ if [ $# -gt 0 ]; then
 	op4)
 		edit_sysctl_interactive
 		exit
+		;;
+	ipv6-ra)
+		repair_ipv6_ra
+		exit $?
 		;;
 	*)
 		echo -e "${ERROR} 未知选项: \"$1\""
