@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
-PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+# 命令搜索路径必须是固定的 root 目录集合：不要追加 ~/bin，
+# 因为 ~ 由调用方的 HOME 展开，sudo 保留 HOME 时本地用户可借此投毒 root 执行的命令。
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin
 export PATH
 
 # =================================================
 #  全局配置区 (Configuration as Data)
 # =================================================
-readonly SH_VER="100.0.6.11"
+readonly SH_VER="100.0.6.15"
 readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 # 内核二进制 (bbr/bbrplus/lotserver) 已从仓库迁移到 Release，按目录整包托管，避免仓库臃肿。
 readonly KERNEL_RELEASE_BASE="https://github.com/ylx2016/Linux-NetSpeed/releases/download/kernels"
@@ -18,7 +20,19 @@ readonly CLOUD_HDR_POOL="https://deb.debian.org/debian/pool/main/l/linux/" # Clo
 # 默认使用与 Update_Shell 相同的权威地址；也可用环境变量 TCPX_URL 临时覆盖：
 #   TCPX_URL=<地址> bash <(curl -fsSL <地址>)
 readonly TCPX_URL_DEFAULT="${GITHUB_RAW_URL}/tcpx.sh"
-readonly TCPX_SELF_URL="${TCPX_URL:-$TCPX_URL_DEFAULT}"
+# 自安装来源只允许 https 且限定 GitHub 主机：TCPX_URL 来自调用环境，
+# 若不加限制，能设置该变量的一方即可让 root 从任意地址取脚本装成 /usr/local/bin/tcpx。
+resolve_self_url() {
+	local url="${1:-}"
+	if [[ -n "$url" && "$url" =~ ^https://(raw[.]githubusercontent[.]com|github[.]com|objects[.]githubusercontent[.]com)/ ]]; then
+		printf '%s' "$url"; echo
+		return 0
+	fi
+	# 此处颜色变量尚未定义，直接使用纯文本提示，避免输出空前缀
+	[[ -n "$url" ]] && echo -e "已忽略不受支持的 TCPX_URL (仅允许 https 且限 GitHub 域名)，改用默认地址。" >&2
+	printf '%s' "$TCPX_URL_DEFAULT"; echo
+}
+readonly TCPX_SELF_URL="$(resolve_self_url "${TCPX_URL:-}")"
 readonly TCPX_INSTALL_PATH="/usr/local/bin/tcpx"
 
 # 颜色变量定义
@@ -85,7 +99,7 @@ check_sys() {
 
 	echo -e "${INFO} 检测到系统: ${OS_TYPE} (${OS_ID} ${OS_VERSION_ID}) - 架构: ${OS_ARCH}"
 
-	# 4. 精简依赖检查 (抛弃笨重的 lsb_release；API 的 JSON 解析已改用 grep，不再依赖 jq)
+	# 4. 精简依赖检查 (不强制 jq/EPEL；有 jq 才启用发布摘要解析，无 jq 仅允许上游直连)
 	local required_cmds=("curl" "wget" "awk")
 
 	if [[ "${OS_TYPE}" == "CentOS" ]]; then
@@ -236,30 +250,208 @@ is_github_url() {
 }
 
 # 统一的镜像 URL 组装规则 (测速与实际下载共用，保证两者行为一致)
+# 默认拼接法: 前缀后直接接不带协议头的原始地址。
+# 部分镜像只接受"前缀 + 完整原始 URL" (fastgit.cc 即如此)，该形式由 use_full_url 生成。
 build_mirror_url() {
 	local prefix="$1"
 	local url="$2"
+	local use_full_url="${3:-0}"
 	if [[ -z "$prefix" ]]; then
 		echo "$url"
+	elif [[ "$use_full_url" == "1" ]]; then
+		echo "${prefix}${url}"
 	else
 		# 镜像站约定: 前缀后直接接不带协议头的原始地址
 		echo "${prefix}$(echo "$url" | sed 's|^https\?://||')"
 	fi
 }
 
+# 探测单个镜像并输出 "http_code 耗时"。镜像返回 404 说明拼接形式可能不被
+# 该站接受，改用"前缀 + 完整 URL"再试一次；超时/连接失败重试也是同样的失败，
+# 因此不做第二遍（避免每个失效镜像白等两轮）。
+# 结果同时写入 PROBE_HTTP / PROBE_TIME / PROBE_OK，供调用方比较与判定。
+mirror_probe() {
+	local prefix="$1"
+	local url="$2"
+	local max_time="${3:-2}"
+	local range_limit="${4:-512}"
+
+	local probe http_code time_cost use_full_url=0
+	probe=$(curl -sL -m "$max_time" -r "0-${range_limit}" -o /dev/null \
+		-w "%{http_code} %{time_total}" \
+		"$(build_mirror_url "$prefix" "$url" 0)" 2>/dev/null)
+	http_code=${probe%% *}
+	if [[ "$http_code" == "404" ]]; then
+		use_full_url=1
+		probe=$(curl -sL -m "$max_time" -r "0-${range_limit}" -o /dev/null \
+			-w "%{http_code} %{time_total}" \
+			"$(build_mirror_url "$prefix" "$url" 1)" 2>/dev/null)
+		http_code=${probe%% *}
+	fi
+
+	time_cost=${probe#* }
+	[[ "$time_cost" == "$probe" ]] && time_cost=""
+	PROBE_HTTP="$http_code"
+	PROBE_TIME="$time_cost"
+	PROBE_FULL_URL="$use_full_url"
+	if [[ "$http_code" =~ ^(200|206)$ && -n "$time_cost" ]]; then
+		PROBE_OK=1
+		return 0
+	fi
+	PROBE_OK=0
+	return 1
+}
+
+# wget 的 HTTP 状态码；无法取得时为空
+wget_http_code() {
+	local log_file="$1"
+	local code=''
+	[[ -f "$log_file" ]] && code=$(grep -oE 'HTTP/[0-9.]+ [0-9]{3}' "$log_file" 2>/dev/null | tail -n 1 | awk '{print $2}')
+	[[ "$code" =~ ^[0-9]{3}$ ]] && echo "$code"
+}
+
+# curl 的 HTTPS 严格参数：-q 不读取 curlrc；--proto/--proto-redir 需要 curl 7.20.2+。
+# 更老的 curl（如 CentOS 6 的 7.19.7）没有 --proto-redir，此时退回"禁止跟随重定向"，
+# 用不跟随而不是放任跳转，避免 HTTPS→HTTP 降级；两者都不支持时 curl 会直接失败。
+curl_secure_args() {
+	if [[ -z "${TCPX_CURL_STRICT:-}" ]]; then
+		if curl -q --proto '=https' --proto-redir '=https' --version >/dev/null 2>&1; then
+			TCPX_CURL_STRICT=1
+		else
+			TCPX_CURL_STRICT=0
+		fi
+	fi
+	if [[ "$TCPX_CURL_STRICT" == "1" ]]; then
+		printf '%s\n' -q -fsSL --proto =https --proto-redir =https
+	else
+		# 老 curl：保留重定向，但改用下载后的 url_effective 复核协议，绝不放行降级内容。
+		echo -e "${TIP} 当前 curl 不支持中继协议限制参数，已改为下载后复核最终 URL 必须为 HTTPS。" >&2
+		printf '%s\n' -q -fsSL --proto =https
+	fi
+}
+
+# 单次下载尝试。返回 0 成功；失败时把该次响应的 HTTP 状态码写入 DOWNLOAD_HTTP，
+# 供调用方判断是否需要换用另一种 URL 拼接形式。
+download_once() {
+	local prefix="$1"
+	local url="$2"
+	local dest="$3"
+	local use_full_url="${4:-0}"
+	local timeout="${5:-15}"
+	local expected_sha256="${6:-}"
+	local target_url http_log http_code downloaded=0
+	DOWNLOAD_HTTP=""
+
+	# 没有独立摘要时只能认证上游 HTTPS，不能把镜像的有效证书当作发布者认证。
+	[[ "$url" == https://* && ( -z "$prefix" || "$prefix" == https://* ) ]] || {
+		echo -e "${ERROR} 下载地址必须使用 HTTPS。" >&2
+		return 1
+	}
+	if [[ -n "$expected_sha256" ]]; then
+		if [[ ! "$expected_sha256" =~ ^[a-fA-F0-9]{64}$ ]] || ! command -v sha256sum >/dev/null 2>&1; then
+			echo -e "${ERROR} 摘要格式无效或缺少 sha256sum，拒绝跳过制品校验。" >&2
+			DOWNLOAD_HTTP="digest-unavailable"
+			return 1
+		fi
+		expected_sha256="${expected_sha256,,}"
+	elif [[ -n "$prefix" || "${TCPX_TLS_INSECURE:-0}" == "1" ]]; then
+		echo -e "${ERROR} 无独立摘要时禁止使用第三方镜像或关闭 TLS 校验。" >&2
+		DOWNLOAD_HTTP="unauthenticated-source"
+		return 1
+	fi
+
+	target_url=$(build_mirror_url "$prefix" "$url" "$use_full_url")
+	if [[ -z "$prefix" ]]; then
+		echo -e "${INFO} 正在请求: ${dest} (直连网络) ..."
+	else
+		echo -e "${INFO} 正在请求: ${dest} (镜像: ${prefix}) ..."
+	fi
+	http_log=$(mktemp) || return 1
+	if [[ -z "$expected_sha256" ]]; then
+		# 限制连接和无进展超时，不限制大内核包的总下载时长。
+		local curl_args=() curl_arg
+		while IFS= read -r curl_arg; do
+			[[ -n "$curl_arg" ]] && curl_args+=("$curl_arg")
+		done < <(curl_secure_args)
+		if http_code=$(curl "${curl_args[@]}" \
+			--connect-timeout "$timeout" --speed-time "$timeout" --speed-limit 1 --retry 1 \
+			-o "$dest" -w '%{http_code} %{url_effective}' "$target_url" 2>"$http_log"); then
+			# 最终落点必须是 HTTPS：老 curl 无法用 --proto-redir 时这条复核是唯一防线。
+			local effective="${http_code#* }"
+			http_code="${http_code%% *}"
+			if [[ "$effective" != https://* ]]; then
+				echo -e "${ERROR} 下载最终落点不是 HTTPS (${effective})，已拒绝该内容。" >&2
+				DOWNLOAD_HTTP="insecure-redirect"
+				rm -f "$http_log" "$dest"
+				return 1
+			fi
+			downloaded=1
+		fi
+		DOWNLOAD_HTTP="$http_code"
+	else
+		# wget -q -S 的响应头仍写 stderr，保留原有的 404 换 URL 拼法。
+		# 只有独立摘要可用时才允许显式 TLS 排障开关；字节校验不可关闭。
+		local wget_tls_args=(--check-certificate)
+		if [[ "${TCPX_TLS_INSECURE:-0}" == "1" ]]; then
+			wget_tls_args=(--no-check-certificate)
+			echo -e "${TIP} 已按 TCPX_TLS_INSECURE=1 关闭连接证书校验；仍强制核验独立 SHA-256。" >&2
+		fi
+		if wget "${wget_tls_args[@]}" -q -S -T "$timeout" -t 2 -O "$dest" "$target_url" 2>"$http_log"; then
+			downloaded=1
+		fi
+		DOWNLOAD_HTTP=$(wget_http_code "$http_log")
+	fi
+
+	if [[ "$downloaded" == "1" && -s "$dest" ]]; then
+		if [[ -n "$expected_sha256" ]]; then
+			local actual_sha256
+			if ! actual_sha256=$(sha256sum -- "$dest" 2>/dev/null); then
+				rm -f "$http_log" "$dest"
+				DOWNLOAD_HTTP="digest-error"
+				return 1
+			fi
+			actual_sha256="${actual_sha256%% *}"
+			if [[ "$actual_sha256" != "$expected_sha256" ]]; then
+				echo -e "${ERROR} ${dest} 校验和不匹配，已丢弃该来源的内容。" >&2
+				rm -f "$http_log" "$dest"
+				DOWNLOAD_HTTP="digest-mismatch"
+				return 1
+			fi
+		fi
+		DOWNLOAD_HTTP=200
+		rm -f "$http_log"
+		echo -e "${INFO} ${dest} 下载成功！"
+		return 0
+	fi
+
+	echo -e "${TIP} 下载失败或内容为空；未接受未经认证的回退内容。" >&2
+	rm -f "$http_log" "$dest"
+	return 1
+}
+
 # 1. 极其稳定且快速的 CN 节点检测 (利用 Cloudflare CDN Trace) 与镜像测速
 check_cn_status() {
 	# 设置 3 秒超时，获取 Cloudflare 边缘节点看到的 IP 归属地
-	local cf_trace=$(curl -sL --max-time 3 https://www.cloudflare.com/cdn-cgi/trace || echo "")
-	if echo "$cf_trace" | grep -q "loc=CN"; then
+	# 优先按 IPv4 出口判断；仅在请求失败或缺少有效 loc 字段时回退 IPv6。
+	# 双栈出口归属地可能不同，IPv4 已有结果时不能再被 IPv6 覆盖。
+	local cf_trace country="" ip_version
+	for ip_version in 4 6; do
+		if cf_trace=$(curl "-${ip_version}" -fsL --max-time 3 https://www.cloudflare.com/cdn-cgi/trace); then
+			country=$(printf '%s\n' "${cf_trace//$'\r'/}" | grep -m1 -E '^loc=[A-Z]{2}$')
+			country="${country#loc=}"
+			[[ -n "$country" ]] && break
+		fi
+	done
+	if [[ "$country" == "CN" ]]; then
 		IS_CN=1
 		echo -e "${INFO} 检测到当前节点位于中国大陆，正在为您测速并选择最快的 GitHub 镜像..."
 
-		# 优先测速：只探测 3 个高质量镜像，选最快者作为首选
+		# 优先测速：只探测 4 个候选镜像，选最快者作为首选
 		local mirrors=(
 			"https://gh-proxy.com/"
 			"https://ghproxy.net/"
 			"https://fastgit.cc/"
+			"https://wget.la/"
 		)
 
 		# 使用极小的 releases 校验文件作为测速目标 (不到 100 字节)，完美适配镜像站的 release 代理规则
@@ -268,24 +460,18 @@ check_cn_status() {
 		local failed_mirrors=()
 
 		for prefix in "${mirrors[@]}"; do
-			# 与 safe_wget 保持完全一致的 URL 改写规则，确保测速结果能代表实际下载可用性
-			local target_url=$(build_mirror_url "$prefix" "$test_url")
-
-			# 测速: 限定最多 2 秒超时，-r 0-512 限制只读取头部数据，防止大文件卡死
-			# 同时取回 http_code，避免"快速返回 403/404 错误页"的失效镜像在测速中胜出
-			local probe=$(curl -sL -m 2 -r 0-512 -o /dev/null -w "%{http_code} %{time_total}" "$target_url" 2>/dev/null)
-			local http_code=$(echo "$probe" | awk '{print $1}')
-			local time_cost=$(echo "$probe" | awk '{print $2}')
-
-			# 仅 200/206 视为有效；其余(含连接失败的空输出)一律记为失败节点
-			if [[ ! "$http_code" =~ ^(200|206)$ ]] || [[ -z "$time_cost" ]]; then
+			# 测速必须与 safe_wget 使用同一套 URL 改写规则（含 404 后的第二种拼接），
+			# 否则测出的"最快镜像"可能在真实下载时立即 404。
+			# -r 0-512 限制只读取头部数据，防止大文件卡死；仅 200/206 视为有效，
+			# 避免"快速返回 403/404 错误页"的失效镜像在测速中胜出。
+			if ! mirror_probe "$prefix" "$test_url" 2 512; then
 				failed_mirrors+=("$prefix")
-			else
-				# 使用 awk 比较浮点数时间，找出延迟最低的
-				if awk "BEGIN {exit !($time_cost < $best_time)}"; then
-					best_time=$time_cost
-					BEST_MIRROR=$prefix
-				fi
+				continue
+			fi
+			# 使用 awk 比较浮点数时间，找出延迟最低的
+			if awk "BEGIN {exit !($PROBE_TIME < $best_time)}"; then
+				best_time=$PROBE_TIME
+				BEST_MIRROR=$prefix
 			fi
 		done
 
@@ -305,7 +491,11 @@ check_cn_status() {
 		fi
 	else
 		IS_CN=0
-		echo -e "${INFO} 当前节点位于海外，使用 GitHub 直连网络。"
+		if [[ -n "$country" ]]; then
+			echo -e "${INFO} 当前节点位于海外，使用 GitHub 直连网络。"
+		else
+			echo -e "${TIP} IPv4 / IPv6 归属地检测均失败，无法确定节点位置，暂用 GitHub 直连网络。"
+		fi
 	fi
 }
 
@@ -313,23 +503,27 @@ check_cn_status() {
 safe_wget() {
 	local url="$1"
 	local dest="$2"
+	local expected_sha256="${3:-}"
 	local timeout=15
 
 	# 定义默认的加速镜像前缀池
-	# 下载兜底池：3 个高质量镜像在前，其余可用镜像随后
+	# 下载兜底池：4 个快速测速候选镜像在前，其余备用镜像随后
 	local mirrors=(
 		"https://gh-proxy.com/"
 		"https://ghproxy.net/"
 		"https://fastgit.cc/"
-		"https://githubdog.com/"
+		"https://wget.la/"
 		"https://tvv.tw/"
 		"https://ghfast.top/"
 	)
 
-	# 核心逻辑：根据测速结果重构下载队列
-	# 非 GitHub 资源 (Debian 官方源等) 直接直连，套镜像只会白等 4 次超时
-	if [[ $IS_CN -eq 0 ]] || ! is_github_url "$url"; then
-		mirrors=("") # 海外节点 / 非 GitHub 资源只保留原生空前缀
+	# 没有独立摘要时不经第三方镜像。只直连上游 HTTPS，失败也不退回未绑定的镜像字节。
+	# 非 GitHub 资源 (Debian 官方源等) 同样只直连；套镜像不仅慢，还会扩大信任范围。
+	if [[ -z "$expected_sha256" || $IS_CN -eq 0 ]] || ! is_github_url "$url"; then
+		mirrors=("")
+		if [[ -z "$expected_sha256" && $IS_CN -ne 0 ]] && is_github_url "$url"; then
+			echo -e "${TIP} 上游未提供可用独立摘要，本次仅使用上游 HTTPS 直连，不经第三方镜像。" >&2
+		fi
 	else
 		# 如果测速成功找到了最优节点，将其提取到数组最前面
 		if [[ -n "$BEST_MIRROR" && "$BEST_MIRROR" != "poll" ]]; then
@@ -344,25 +538,19 @@ safe_wget() {
 	fi
 
 	for prefix in "${mirrors[@]}"; do
-		# 组装最终下载链接 (与测速阶段共用同一套规则)
-		local target_url=$(build_mirror_url "$prefix" "$url")
+		# 每个镜像默认用"前缀 + 去协议头"的拼接法；若该站只认完整 URL（如 fastgit.cc），
+		# 首次即返回 404，此时自动换用"前缀 + 完整 URL"再试一次，而不是直接放弃该节点。
+		local use_full_url=0
+		while :; do
+			download_once "$prefix" "$url" "$dest" "$use_full_url" "$timeout" "$expected_sha256" && return 0
 
-		if [[ -z "$prefix" ]]; then
-			echo -e "${INFO} 正在请求: ${dest} (直连网络) ..."
-		else
-			echo -e "${INFO} 正在请求: ${dest} (镜像: ${prefix}) ..."
-		fi
-
-		# 使用 wget 下载，跳过证书校验
-		if wget --no-check-certificate -qT "$timeout" -t 2 -O "$dest" "$target_url"; then
-			# 防御半截包/错误页: 空文件视为失败，继续切换节点
-			if [[ -s "$dest" ]]; then
-				echo -e "${INFO} ${dest} 下载成功！"
-				return 0
+			if [[ -n "$prefix" && "$use_full_url" == "0" && "$DOWNLOAD_HTTP" == "404" ]]; then
+				echo -e "${TIP} ${prefix} 对默认拼接返回 404，改用完整 URL 形式重试..."
+				use_full_url=1
+				continue
 			fi
-			echo -e "${TIP} 下载内容为空，判定为无效响应。"
-			rm -f "$dest"
-		fi
+			break
+		done
 
 		# 当前节点失败时提示并继续下一个循环
 		echo -e "${TIP} 当前节点下载异常，正在无缝切换备用节点..."
@@ -409,6 +597,33 @@ pick_latest_asset() {
 	printf '%s\n' "${versioned[@]}" | sort -V -k1,1 | tail -n 1 | sed 's/^[^ ]* //'
 }
 
+# 从同一 GitHub asset 对象中精确关联 URL 与 SHA-256，不依赖字段顺序或缩进。
+# jq 是可选能力（不强制旧 CentOS 安装 EPEL）：缺少解析器时明确只直连，不猜测摘要。
+# 空输出只表示缺解析器或该资产未提供摘要；JSON/重复资产/摘要格式错误返回失败。
+asset_digest_for_url() {
+	local response="$1"
+	local url="$2"
+	if ! command -v jq >/dev/null 2>&1; then
+		echo -e "${TIP} 未安装 jq，无法建立独立摘要绑定；该资源仅允许上游 HTTPS 直连。" >&2
+		return 0
+	fi
+	local digest
+	if ! digest=$(printf '%s' "$response" | jq -er --arg url "$url" '
+		if type != "array" then error("invalid releases response") else . end |
+		[.[] | .assets[]? | select(.browser_download_url == $url)] as $assets |
+		if ($assets | length) != 1 then error("asset URL is missing or ambiguous")
+		elif $assets[0].digest == null then ""
+		else $assets[0].digest |
+			if type != "string" then error("invalid asset digest")
+			elif test("^sha256:[0-9a-fA-F]{64}$") then ltrimstr("sha256:")
+			else error("invalid SHA-256 digest") end
+		end'); then
+		return 1
+	fi
+	# 统一小写由 bash 完成，避免依赖 jq 1.5 才有的 ascii_downcase
+	printf '%s' "${digest,,}"
+}
+
 # 3. 稳健的 GitHub 资源获取函数 (用 grep 从 JSON 提取下载直链，再通过 grep 多重过滤)
 # 用法: get_github_asset <仓库名> <Tag关键词> <文件名关键词> [架构关键词]
 # 示例: get_github_asset "ylx2016/kernel" "Debian_Kernel" "headers"
@@ -422,17 +637,31 @@ get_github_asset() {
 	# 本脚本永远只关心"最高版本"，取满一页即可，无需翻页。
 	local api_url="https://api.github.com/repos/${repo}/releases?per_page=100"
 
-	local response=$(curl -sL --max-time 10 "$api_url")
+	local response
+	local curl_args=() curl_arg
+	while IFS= read -r curl_arg; do
+		[[ -n "$curl_arg" ]] && curl_args+=("$curl_arg")
+	done < <(curl_secure_args)
+	if ! response=$(curl "${curl_args[@]}" --max-time 10 "$api_url"); then
+		echo -e "${ERROR} GitHub API 请求失败，拒绝解析不完整或错误响应。" >&2
+		return 1
+	fi
 	if echo "$response" | grep -q "API rate limit exceeded"; then
 		echo -e "${ERROR} 触发 GitHub API 频率限制！(当前 IP 请求过多)" >&2
 		return 1
 	fi
 
-	# 提取出该仓库所有的下载直链。
-	# 原用 jq，现改为纯 grep：browser_download_url 字段仅出现在 release 资源(assets)里，
-	# 且 GitHub API 不转义 URL 中的斜杠，故按字段名精确匹配后取其 https 值即可，
-	# 效果等价于 jq -r '.[].assets[]?.browser_download_url'，同时免去 jq (及 CentOS 的 EPEL) 依赖。
-	local all_urls=$(echo "$response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+"' | grep -oE 'https?://[^"]+')
+	# 有 jq 时使用完整 JSON 解析，避免字段顺序、空白和转义影响资产关联。
+	# 极简/旧 CentOS 无 jq 时保留 URL 提取兼容，但不再猜摘要，下载器将只直连。
+	local all_urls
+	if command -v jq >/dev/null 2>&1; then
+		all_urls=$(printf '%s' "$response" | jq -er '
+			if type != "array" then error("invalid releases response") else . end |
+			.[] | .assets[]? | .browser_download_url |
+			select(type == "string") | select(startswith("https://"))') || return 1
+	else
+		all_urls=$(printf '%s\n' "$response" | grep -oE '"browser_download_url":[[:space:]]*"[^"]+"' | grep -oE 'https://[^"]+')
+	fi
 	if [[ -z "$all_urls" ]]; then
 		echo -e "${ERROR} 无法从 ${repo} 获取资源列表，请检查网络或稍后再试！" >&2
 		return 1
@@ -459,7 +688,14 @@ get_github_asset() {
 		return 1
 	fi
 
-	echo "$asset_url"
+	# 输出 "URL<TAB>sha256"；解析错误不能伪装成“未提供摘要”。
+	# 真正缺摘要或无 jq 时，只允许后续使用上游 HTTPS 直连。
+	local digest
+	if ! digest=$(asset_digest_for_url "$response" "$asset_url"); then
+		echo -e "${ERROR} 无法可靠关联资源与摘要，已中止。" >&2
+		return 1
+	fi
+	printf '%s\t%s\n' "$asset_url" "$digest"
 }
 
 # =================================================
@@ -486,6 +722,8 @@ install_kernel_generic() {
 	local head_url="$2"
 	local img_url="$3"
 	local kernel_version="$4" # 新增参数，用于 UI 显示
+	local head_sha256="${5:-}" # 可选: Headers 包摘要，来自受 TLS 保护的发布元数据
+	local img_sha256="${6:-}"  # 可选: 内核包摘要；为空表示该源不提供摘要，此时仅依赖 TLS
 
 	echo -e "${INFO} ================================================"
 	if [[ -n "$kernel_version" ]]; then
@@ -526,8 +764,8 @@ install_kernel_generic() {
 		local head_file="kernel-headers.rpm"
 		local img_file="kernel-image.rpm"
 
-		[[ -n "$head_url" ]] && { safe_wget "$head_url" "$head_file" || return 1; }
-		safe_wget "$img_url" "$img_file" || return 1
+		[[ -n "$head_url" ]] && { safe_wget "$head_url" "$head_file" "$head_sha256" || return 1; }
+		safe_wget "$img_url" "$img_file" "$img_sha256" || return 1
 
 		# 下载全部成功后才动系统
 		remove_old_headers
@@ -550,8 +788,8 @@ install_kernel_generic() {
 		local img_file="linux-image.deb"
 		local deb_list=()
 
-		[[ -n "$head_url" ]] && { safe_wget "$head_url" "$head_file" || return 1; }
-		safe_wget "$img_url" "$img_file" || return 1
+		[[ -n "$head_url" ]] && { safe_wget "$head_url" "$head_file" "$head_sha256" || return 1; }
+		safe_wget "$img_url" "$img_file" "$img_sha256" || return 1
 
 		# 下载全部成功后才动系统
 		remove_old_headers
@@ -615,8 +853,14 @@ installbbr() {
 	echo -e "${INFO} 正在向 Github/ylx2016 请求最新 ${tag_kw} 内核数据..."
 
 	# 获取下载链接 (现在抓取到的绝对纯净，无需二次 grep -v)
-	head_url=$(get_github_asset "ylx2016/kernel" "${tag_kw}" "headers" "${arch_kw}")
-	img_url=$(get_github_asset "ylx2016/kernel" "${tag_kw}" "${img_kw}" "${arch_kw}")
+	# 返回 "URL<TAB>sha256"：摘要在下载阶段绑定镜像返回的字节
+	local head_meta img_meta head_sha="" img_sha=""
+	head_meta=$(get_github_asset "ylx2016/kernel" "${tag_kw}" "headers" "${arch_kw}") || return 1
+	img_meta=$(get_github_asset "ylx2016/kernel" "${tag_kw}" "${img_kw}" "${arch_kw}") || return 1
+	head_url="${head_meta%%$'	'*}"
+	img_url="${img_meta%%$'	'*}"
+	[[ "$head_meta" == *$'	'* ]] && head_sha="${head_meta#*$'	'}"
+	[[ "$img_meta" == *$'	'* ]] && img_sha="${img_meta#*$'	'}"
 
 	# 【核心修复 2】版本号仅用于界面显示：只从文件名 (${img_url##*/}) 中提取，切勿扫描整条 URL。
 	# 因为发布 tag 内含构建日期 (如 Debian_Kernel_Cloud_7.2_bbr_2026.08.18-0005)，整条 URL 的首个
@@ -631,7 +875,7 @@ installbbr() {
 	fi
 
 	# 将解析出的版本号作为第四个参数传递给安装函数
-	install_kernel_generic "BBR Cloud 优化内核" "$head_url" "$img_url" "$kernel_version"
+	install_kernel_generic "BBR Cloud 优化内核" "$head_url" "$img_url" "$kernel_version" "$head_sha" "$img_sha"
 }
 
 # 安装 BBRplus 新版内核 (调用引擎)
@@ -656,11 +900,16 @@ installbbrplusnew() {
 
 	echo -e "${INFO} 正在向 UJX6N/bbrplus-6.x_stable 请求数据..."
 	# 利用精准的参数向下传递
-	head_url=$(get_github_asset "UJX6N/bbrplus-6.x_stable" "${tag_kw}" "headers" "${arch_kw}.*${ext}")
-	img_url=$(get_github_asset "UJX6N/bbrplus-6.x_stable" "${tag_kw}" "${img_kw}" "${arch_kw}.*${ext}")
+	local head_meta img_meta head_sha="" img_sha=""
+	head_meta=$(get_github_asset "UJX6N/bbrplus-6.x_stable" "${tag_kw}" "headers" "${arch_kw}.*${ext}") || return 1
+	img_meta=$(get_github_asset "UJX6N/bbrplus-6.x_stable" "${tag_kw}" "${img_kw}" "${arch_kw}.*${ext}") || return 1
+	head_url="${head_meta%%$'	'*}"
+	img_url="${img_meta%%$'	'*}"
+	[[ "$head_meta" == *$'	'* ]] && head_sha="${head_meta#*$'	'}"
+	[[ "$img_meta" == *$'	'* ]] && img_sha="${img_meta#*$'	'}"
 
 	local kernel_version=$(echo "${img_url##*/}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
-	install_kernel_generic "BBRplus(UJX6N)新版内核" "$head_url" "$img_url" "$kernel_version"
+	install_kernel_generic "BBRplus(UJX6N)新版内核" "$head_url" "$img_url" "$kernel_version" "$head_sha" "$img_sha"
 }
 
 # 安装 BBRplus 内核 4.14.129 (cx9208版)
@@ -1080,11 +1329,48 @@ fetch_kernel_archive() {
 		echo -e "${ERROR} ${name} 内核整包下载失败！"
 		return 1
 	fi
-	if ! tar xzf "$tarball" -C "$dest"; then
+	# 解压前先列成员：拒绝绝对路径与 .. 片段，避免归档把文件写到工作目录之外。
+	# tar 自身的默认策略随版本不同（CentOS 6 tar 1.23 与 7 的 1.26 行为有差异），
+	# 这里显式校验，不依赖解压器的版本相关默认值。
+	local members details
+	if ! members=$(LC_ALL=C TAR_OPTIONS= tar tzPf "$tarball" 2>/dev/null) || [[ -z "$members" ]]; then
+		echo -e "${ERROR} ${name} 内核整包无法读取或不含成员。"
+		rm -f "$tarball"
+		return 1
+	fi
+	if printf '%s\n' "$members" | grep -qE '(^/)|(^|/)\.\.(/|$)'; then
+		echo -e "${ERROR} ${name} 内核整包含有越界路径成员，已拒绝解压。"
+		rm -f "$tarball"
+		return 1
+	fi
+	# 名称合法不代表链接目标合法；仓库型归档常见相对符号链接，故允许 symlink，
+	# 但解压后必须复核每个链接都仍落在目标目录内。硬链接/设备/FIFO 一律拒绝。
+	if ! details=$(LC_ALL=C TAR_OPTIONS= tar tvzPf "$tarball" 2>/dev/null) || \
+		printf '%s\n' "$details" | grep -qvE '^[-dl]'; then
+		echo -e "${ERROR} ${name} 内核整包含有硬链接或特殊成员，已拒绝解压。"
+		rm -f "$tarball"
+		return 1
+	fi
+	if ! TAR_OPTIONS= tar xzf "$tarball" -C "$dest" --no-same-owner --no-same-permissions; then
 		echo -e "${ERROR} ${name} 内核整包解压失败 (文件可能损坏或磁盘空间不足)。"
 		rm -f "$tarball"
 		return 1
 	fi
+	local dest_root="$dest" link resolved
+	[[ "$dest_root" == /* ]] || dest_root="$(pwd)/${dest}"
+	dest_root="${dest_root%/}"
+	while IFS= read -r link; do
+		[[ -n "$link" ]] || continue
+		resolved=$(readlink -m -- "$link" 2>/dev/null)
+		case "$resolved" in
+		"$dest_root"/*) ;;
+		*)
+			echo -e "${ERROR} ${name} 内核整包含有指向目标目录之外的符号链接，已中止。"
+			rm -f "$tarball"
+			return 1
+			;;
+		esac
+	done < <(find "$dest" -type l 2>/dev/null)
 	rm -f "$tarball"
 	return 0
 }
@@ -1151,11 +1437,11 @@ installlot() {
 		# Debian/Ubuntu 走老旧的 snapshot.debian.org 源
 		local base_deb="" img_deb=""
 		if [[ "$OS_ID" == "debian" && "$OS_VERSION_ID" == "8" ]]; then
-			base_deb="http://snapshot.debian.org/archive/debian/20120304T220938Z/pool/main/l/linux-base/linux-base_3.5_all.deb"
-			img_deb="http://snapshot.debian.org/archive/debian/20171008T163152Z/pool/main/l/linux/linux-image-3.16.0-4-amd64_3.16.43-2+deb8u5_amd64.deb"
+			base_deb="https://snapshot.debian.org/archive/debian/20120304T220938Z/pool/main/l/linux-base/linux-base_3.5_all.deb"
+			img_deb="https://snapshot.debian.org/archive/debian/20171008T163152Z/pool/main/l/linux/linux-image-3.16.0-4-amd64_3.16.43-2+deb8u5_amd64.deb"
 		elif [[ "$OS_ID" == "debian" && "$OS_VERSION_ID" == "9" ]]; then
-			base_deb="http://snapshot.debian.org/archive/debian/20160917T042239Z/pool/main/l/linux-base/linux-base_4.5_all.deb"
-			img_deb="http://snapshot.debian.org/archive/debian/20171224T175424Z/pool/main/l/linux/linux-image-4.9.0-4-amd64_4.9.65-3+deb9u1_amd64.deb"
+			base_deb="https://snapshot.debian.org/archive/debian/20160917T042239Z/pool/main/l/linux-base/linux-base_4.5_all.deb"
+			img_deb="https://snapshot.debian.org/archive/debian/20171224T175424Z/pool/main/l/linux/linux-image-4.9.0-4-amd64_4.9.65-3+deb9u1_amd64.deb"
 		else
 			echo -e "${ERROR} Lotserver 不支持当前系统版本！"
 			return 1
@@ -1699,16 +1985,19 @@ remove_bbr_lotserver() {
 	systemctl disable --now lotspeed-boot.service >/dev/null 2>&1
 
 	# 修改：停用并卸载 LotSpeed 模块 (但不物理删除文件，以便随时通过菜单快速切换)
-	if command -v lotspeed >/dev/null 2>&1; then
-		lotspeed stop >/dev/null 2>&1
+	local lotspeed_bin
+	if lotspeed_bin=$(trusted_command_path lotspeed); then
+		"$lotspeed_bin" stop >/dev/null 2>&1
 		rmmod lotspeed >/dev/null 2>&1
+	elif command -v lotspeed >/dev/null 2>&1; then
+		echo -e "${TIP} LotSpeed 助手文件或父目录不可信，已跳过执行。" >&2
 	fi
 	# 如果没有 helper 脚本但也加载了模块的兜底清理
 	if lsmod | grep -q "lotspeed"; then
 		rmmod lotspeed >/dev/null 2>&1
 	fi
 
-	if [[ -e /appex/bin/lotServer.sh ]]; then
+	if is_trusted_root_file /appex/bin/lotServer.sh; then
 		local tmp_lot
 		tmp_lot=$(mktemp /tmp/lotserver.XXXXXX)
 		if fetch_remote_script "https://raw.githubusercontent.com/fei5seven/lotServer/master/lotServerInstall.sh" "$tmp_lot" >/dev/null 2>&1; then
@@ -1783,6 +2072,10 @@ startlotserver() {
 
 	if [[ ! -f /appex/etc/config ]]; then
 		echo -e "${ERROR} lotServer 安装失败，未生成配置文件 /appex/etc/config！"
+		return 1
+	fi
+	if ! is_trusted_root_file /appex/bin/lotServer.sh || ! is_trusted_root_file /appex/etc/config; then
+		echo -e "${ERROR} /appex 下的助手或配置不是 root 拥有的普通文件，拒绝以 root 执行/改写。" >&2
 		return 1
 	fi
 	sed -i '/advinacc/d; /maxmode/d' /appex/etc/config
@@ -2159,8 +2452,14 @@ startbrutal() {
 # 让 99-zz-tcpx-accel.conf 里的 lotspeed 生效 (排序在 99-tcpfit.conf 之后，稳压其默认)。
 setup_lotspeed_boot_service() {
 	local lotspeed_bin sysctl_bin
-	lotspeed_bin=$(command -v lotspeed 2>/dev/null || echo "/usr/local/bin/lotspeed")
-	sysctl_bin=$(command -v sysctl 2>/dev/null || echo "/sbin/sysctl")
+	if ! lotspeed_bin=$(trusted_command_path lotspeed) || ! sysctl_bin=$(trusted_command_path sysctl); then
+		echo -e "${ERROR} LotSpeed 或 sysctl 的文件/父目录不可信，拒绝写入开机执行路径。" >&2
+		return 1
+	fi
+	if [[ -e "$LOTSPEED_BOOT_SERVICE" || -L "$LOTSPEED_BOOT_SERVICE" ]] && ! is_trusted_root_file "$LOTSPEED_BOOT_SERVICE"; then
+		echo -e "${ERROR} 现有 LotSpeed 服务文件不可信，拒绝覆盖。" >&2
+		return 1
+	fi
 	cat >"$LOTSPEED_BOOT_SERVICE" <<EOF
 [Unit]
 Description=Load LotSpeed and apply congestion control
@@ -2175,13 +2474,15 @@ RemainAfterExit=yes
 [Install]
 WantedBy=multi-user.target
 EOF
-	systemctl daemon-reload >/dev/null 2>&1
+	[[ $? -eq 0 ]] || return 1
+	systemctl daemon-reload >/dev/null 2>&1 || return 1
 	# 只 enable 建立开机软链，不用 --now：此刻 LotSpeed 已在运行，若再触发 oneshot 里的
 	# `lotspeed start` 会因重复启动返回非零，导致误报"启用失败"。开机自启才是这里的目的。
 	if systemctl enable lotspeed-boot.service >/dev/null 2>&1; then
 		echo -e "${INFO} 已启用 LotSpeed 开机自启 (lotspeed-boot.service)，重启后仍为默认算法。"
 	else
 		echo -e "${TIP} LotSpeed 开机自启服务启用失败 (非 systemd 环境?)，重启后可能需手动 lotspeed start。"
+		return 1
 	fi
 }
 
@@ -2207,8 +2508,8 @@ install_lotspeed() {
 		sed -i '/net.ipv4.tcp_congestion_control/d' /etc/sysctl.d/99-sysctl.conf /etc/sysctl.conf "$TCPX_ACCEL_DROPIN" 2>/dev/null
 		echo "net.ipv4.tcp_congestion_control=lotspeed" >>"$sysctl_conf"
 		apply_sysctl >/dev/null || return 1
+		setup_lotspeed_boot_service || return 1
 		echo -e "${INFO} LotSpeed 已设置为默认拥塞控制算法！"
-		setup_lotspeed_boot_service
 		disable_tcpfit_shaper_force
 	else
 		echo -e "${ERROR} LotSpeed 模块加载失败，请检查上方编译日志（通常是因为内核 Headers 缺失或版本过低）。"
@@ -2222,10 +2523,15 @@ enable_lotspeed_standalone() {
 		sleep 3
 		return
 	fi
+	local lotspeed_bin
+	if ! lotspeed_bin=$(trusted_command_path lotspeed); then
+		echo -e "${ERROR} LotSpeed 助手文件或父目录不可信，拒绝启动。" >&2
+		return 1
+	fi
 	remove_bbr_lotserver || return 1
 	disable_tcpfit_shaper_force
 	echo -e "${INFO} 正在启动 LotSpeed 加速..."
-	lotspeed start >/dev/null 2>&1
+	"$lotspeed_bin" start >/dev/null 2>&1 || return 1
 
 	# 确保将其写死为默认启动项
 	local sysctl_conf
@@ -2237,7 +2543,7 @@ enable_lotspeed_standalone() {
 	apply_sysctl >/dev/null || return 1
 
 	# remove_bbr_lotserver 已先禁用旧的开机服务，此处按当前 LotSpeed 状态重新启用
-	setup_lotspeed_boot_service
+	setup_lotspeed_boot_service || return 1
 
 	echo -e "${INFO} LotSpeed 加速已成功切换并启用！"
 }
@@ -2246,8 +2552,64 @@ enable_lotspeed_standalone() {
 #  杂项与附加功能模块 (补齐缺失的函数)
 # =================================================
 
+# 命令必须解析为可执行的受信普通文件；返回规范绝对路径，兼容 /sbin -> /usr/sbin。
+# 固定返回路径后再使用，避免之后重新走 PATH；拒绝 systemd 的空白、% 等特殊字符。
+trusted_command_path() {
+	local path
+	path=$(type -P "$1" 2>/dev/null) || return 1
+	path=$(readlink -f -- "$path" 2>/dev/null) || return 1
+	[[ "$path" =~ ^/[a-zA-Z0-9_./+-]+$ && -x "$path" ]] || return 1
+	is_trusted_root_file "$path" || return 1
+	printf '%s\n' "$path"
+}
+
+# 该组是否存在 root 之外的成员（显式成员，或把它当作主组）。
+# Debian/Ubuntu 的 /usr/local/bin 默认是 root:staff 2775；只有确认组内没有其他可写主体时才接受。
+group_has_non_root_members() {
+	local gid="$1"
+	[[ -n "$gid" && "$gid" =~ ^[0-9]+$ ]] || return 0
+	awk -F: -v g="$gid" '$3==g { n=split($4,m,","); for (i=1;i<=n;i++) if (m[i]!="" && m[i]!="root") { found=1; exit } } END { exit !found }' \
+		/etc/group 2>/dev/null && return 0
+	awk -F: -v g="$gid" '$4==g && $1!="root" { found=1; exit } END { exit !found }' /etc/passwd 2>/dev/null && return 0
+	return 1
+}
+
+# 文件及每级父目录都必须由 UID 0 拥有，不能为符号链接。
+# 叶子不允许他人写；父目录不允许他人写，组可写时要求该组没有 root 之外的成员，
+# 这样既接受发行版默认的 root:staff 系统目录，也排除普通用户可改名替换的目录。
+is_trusted_root_file() {
+	local path="$1" metadata uid mode gid leaf=1
+	[[ "$path" == /* && -f "$path" && ! -L "$path" ]] || return 1
+	while :; do
+		[[ ! -L "$path" ]] || return 1
+		metadata=$(stat -c '%u %a %g' -- "$path" 2>/dev/null) || return 1
+		uid="${metadata%% *}"
+		mode="${metadata#* }"
+		gid="${mode#* }"
+		mode="${mode%% *}"
+		[[ "$uid" == "0" && "$mode" =~ ^[0-7]{1,4}$ ]] || return 1
+		(( (8#$mode & 8#002) == 0 )) || return 1
+		if (( (8#$mode & 8#020) != 0 )); then
+			# 组可写父目录：root 组视为受信（加入 root 组本身已需 root 授权）；
+			# 其它组要求没有 root 之外的成员，覆盖 Debian 的 root:staff 2775 系统目录。
+			if [[ "$leaf" == "1" ]]; then
+				return 1
+			fi
+			if [[ "$gid" != "0" ]] && group_has_non_root_members "$gid"; then
+				return 1
+			fi
+		fi
+		leaf=0
+		[[ "$path" == "/" ]] && break
+		path="${path%/*}"
+		[[ -n "$path" ]] || path="/"
+		[[ -d "$path" ]] || return 1
+	done
+	return 0
+}
+
 # 通用的远程脚本获取器: 下载到临时文件 -> 校验 -> 交给调用方处理
-# 统一走 safe_wget，国内机才能借助镜像拿到 raw.githubusercontent.com 上的内容
+# 统一走 safe_wget；脚本没有独立摘要时必须直连上游 HTTPS，不经第三方镜像。
 fetch_remote_script() {
 	local url="$1"
 	local dest="$2"
@@ -3099,7 +3461,7 @@ check_status() {
 			;;
 		esac
 	elif [[ "$kernel_status" == "Lotserver" ]]; then
-		if [[ -e /appex/bin/lotServer.sh ]]; then
+		if is_trusted_root_file /appex/bin/lotServer.sh; then
 			run_status=$(bash /appex/bin/lotServer.sh status | grep "LotServer" | awk '{print $3}')
 			[[ "$run_status" == "running!" ]] && run_status="启动成功" || run_status="启动失败"
 		else
