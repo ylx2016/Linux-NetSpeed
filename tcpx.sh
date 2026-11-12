@@ -8,7 +8,7 @@ export PATH
 # =================================================
 #  全局配置区 (Configuration as Data)
 # =================================================
-readonly SH_VER="100.0.6.15"
+readonly SH_VER="100.0.6.16"
 readonly GITHUB_RAW_URL="https://raw.githubusercontent.com/ylx2016/Linux-NetSpeed/master"
 # 内核二进制 (bbr/bbrplus/lotserver) 已从仓库迁移到 Release，按目录整包托管，避免仓库臃肿。
 readonly KERNEL_RELEASE_BASE="https://github.com/ylx2016/Linux-NetSpeed/releases/download/kernels"
@@ -235,7 +235,8 @@ pre_install_check() {
 #  网络通信与下载模块
 # =================================================
 
-# 全局变量：是否在中国大陆
+# 全局变量：节点网络归属。0=海外 (仅直连)，1=中国大陆 (测速后镜像优先)，2=无法判定
+# (按国内处理：不测速，镜像顺序默认，末尾仍保留直连兜底)
 IS_CN=0
 
 # 全局最优镜像变量
@@ -429,18 +430,65 @@ download_once() {
 	return 1
 }
 
-# 1. 极其稳定且快速的 CN 节点检测 (利用 Cloudflare CDN Trace) 与镜像测速
+# 归属地检测端点。单一端点会被本地网络单向阻断：www.cloudflare.com 在部分国内线路
+# 完全不可达 (cloudflare.com 同一时间却正常)，整机就被误判成海外。因此按顺序多源尝试：
+#   cf   : Cloudflare trace，取 loc=XX 整行
+#   code : 纯文本两位国家码
+#   cn   : ipip.net 文本 (中国大陆 <省份> 记作 CN，港澳台不算)
+CN_STATUS_ENDPOINTS=(
+	"cf|https://cloudflare.com/cdn-cgi/trace"
+	"code|https://ipinfo.io/country"
+	"cn|https://myip.ipip.net"
+)
+# 单端点超时 (秒)。端点失效时通常一路挂到超时，故只做一次尝试、按端点顺序兜底。
+CN_STATUS_TIMEOUT=2
+
+# 从端点响应解析 ISO 国家码；无法识别时输出空串。
+parse_geo_country() {
+	local kind="$1" body="${2//$'\r'/}" line
+	case "$kind" in
+	cf)
+		line=$(printf '%s\n' "$body" | grep -m1 -E '^loc=[A-Z]{2}$') || return 0
+		printf '%s' "${line#loc=}"
+		;;
+	code)
+		line=$(printf '%s' "$body" | tr -d '[:space:]')
+		[[ "$line" =~ ^[A-Z]{2}$ ]] && printf '%s' "$line"
+		;;
+	cn)
+		line=$(printf '%s\n' "$body" | grep -m1 -E '来自于：中国') || return 0
+		# 港澳台是明确结论 (非大陆)，返回各自代码而不是留空，避免退化成"无法判定"
+		case "$line" in
+		*香港*) printf 'HK' ;;
+		*澳门*) printf 'MO' ;;
+		*台湾*) printf 'TW' ;;
+		*) printf 'CN' ;;
+		esac
+		;;
+	esac
+}
+
+# 在指定地址族下依次尝试所有端点，输出第一个有效国家码。
+detect_geo_country() {
+	local family="$1" entry kind url body country
+	for entry in "${CN_STATUS_ENDPOINTS[@]}"; do
+		kind=${entry%%|*}
+		url=${entry#*|}
+		body=$(curl "-${family}" -fsL --max-time "$CN_STATUS_TIMEOUT" "$url" 2>/dev/null) || continue
+		country=$(parse_geo_country "$kind" "$body")
+		[[ -n "$country" ]] && { printf '%s' "$country"; return 0; }
+	done
+	return 1
+}
+
+# 1. CN 节点检测与镜像测速
 check_cn_status() {
-	# 设置 3 秒超时，获取 Cloudflare 边缘节点看到的 IP 归属地
-	# 优先按 IPv4 出口判断；仅在请求失败或缺少有效 loc 字段时回退 IPv6。
+	# 优先按 IPv4 出口判断；仅在 IPv4 拿不到任何有效结果时回退 IPv6。
 	# 双栈出口归属地可能不同，IPv4 已有结果时不能再被 IPv6 覆盖。
-	local cf_trace country="" ip_version
+	local country="" ip_version
 	for ip_version in 4 6; do
-		if cf_trace=$(curl "-${ip_version}" -fsL --max-time 3 https://www.cloudflare.com/cdn-cgi/trace); then
-			country=$(printf '%s\n' "${cf_trace//$'\r'/}" | grep -m1 -E '^loc=[A-Z]{2}$')
-			country="${country#loc=}"
-			[[ -n "$country" ]] && break
-		fi
+		country=$(detect_geo_country "$ip_version") || country=""
+		[[ -n "$country" ]] && break
 	done
 	if [[ "$country" == "CN" ]]; then
 		IS_CN=1
@@ -490,11 +538,14 @@ check_cn_status() {
 			done
 		fi
 	else
-		IS_CN=0
 		if [[ -n "$country" ]]; then
+			IS_CN=0
 			echo -e "${INFO} 当前节点位于海外，使用 GitHub 直连网络。"
 		else
-			echo -e "${TIP} IPv4 / IPv6 归属地检测均失败，无法确定节点位置，暂用 GitHub 直连网络。"
+			# 判定失败时按国内网络处理：国内直连 GitHub 常被阻断，而镜像池末尾本就保留
+			# 直连兜底。无独立摘要的资源依然只走上游 HTTPS 直连，不扩大信任范围。
+			IS_CN=2
+			echo -e "${TIP} IPv4 / IPv6 归属地检测均失败，无法确定节点位置，改为镜像优先、直连兜底。"
 		fi
 	fi
 }
